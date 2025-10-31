@@ -1,0 +1,32 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "timezone": "Etc/UTC",
+  "prConcurrentLimit": 5,
+  "labels": [
+    "dependencies"
+  ],
+  "reviewersFromCodeOwners": true,
+  "packageRules": [
+    {
+      "matchManagers": [
+        "cargo"
+      ],
+      "groupName": "cargo dependencies",
+      "schedule": [
+        "before 6am on monday"
+      ]
+    },
+    {
+      "matchManagers": [
+        "gomod"
+      ],
+      "groupName": "go modules",
+      "schedule": [
+        "before 6am on monday"
+      ]
+    }
+  ]
+}

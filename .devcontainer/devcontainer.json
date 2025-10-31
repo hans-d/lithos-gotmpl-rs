@@ -1,0 +1,36 @@
+{
+  "name": "lithos-gotmpl",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "ghcr.io/devcontainers/features/rust:1": {
+      "toolchain": "stable",
+      "profile": "minimal"
+    },
+    "ghcr.io/devcontainers/features/go:1": {
+      "version": "1.25.1"
+    },
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.12"
+    }
+  },
+  "mounts": [
+    "source=${localEnv:HOME}/.cargo/bin,target=/home/vscode/.cargo/bin,type=bind"
+  ],
+  "postCreateCommand": "bash .devcontainer/postCreate.sh",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "rust-analyzer.cargo.targetDir": "target",
+        "editor.formatOnSave": true,
+        "editor.rulers": [100]
+      },
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "serayuzgur.crates",
+        "tamasfe.even-better-toml",
+        "vadimcn.vscode-lldb"
+      ]
+    }
+  },
+  "remoteUser": "vscode"
+}

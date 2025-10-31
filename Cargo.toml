@@ -1,0 +1,21 @@
+[workspace]
+resolver = "2"
+members = ["crates/lithos-gotmpl-engine","crates/lithos-gotmpl-core","crates/lithos-sprig"]
+exclude = ["fuzz"]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.70"
+license = "MIT OR Apache-2.0"
+authors = ["Hans Donner <hans@hansdonner.nl>"]
+
+[workspace.metadata.release-plz]
+config-path = "release-plz.toml"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+all = "warn"
+pedantic = "warn"

@@ -1,0 +1,76 @@
+---
+name: Deep Testing
+
+'on':
+  schedule:
+    - cron: "0 0 * * 0"
+  workflow_dispatch:
+
+jobs:
+  fuzz:
+    name: Fuzz Testing
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        if: ${{ hashFiles('fuzz/Cargo.toml') != '' }}
+
+      - name: Set up Rust nightly
+        if: ${{ hashFiles('fuzz/Cargo.toml') != '' }}
+        uses: dtolnay/rust-toolchain@nightly
+
+      - uses: Swatinem/rust-cache@v2
+        if: ${{ hashFiles('fuzz/Cargo.toml') != '' }}
+
+      - name: Install cargo-fuzz
+        if: ${{ hashFiles('fuzz/Cargo.toml') != '' }}
+        run: cargo install cargo-fuzz
+
+      - name: Fuzz parser (10 min)
+        if: ${{ hashFiles('fuzz/Cargo.toml') != '' }}
+        run: cargo +nightly fuzz run template_parse -- -max_total_time=600
+        continue-on-error: true
+
+      - name: Fuzz renderer (10 min)
+        if: ${{ hashFiles('fuzz/Cargo.toml') != '' }}
+        run: cargo +nightly fuzz run template_render -- -max_total_time=600
+        continue-on-error: true
+
+      - name: Upload corpus if crashes found
+        if: ${{ failure() && hashFiles('fuzz/Cargo.toml') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-artifacts
+          path: fuzz/artifacts/
+
+  mutation:
+    name: Mutation Testing (Monthly)
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'schedule' &&
+      github.event.schedule == '0 0 1 * *'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install just
+        uses: taiki-e/install-action@v2
+        with:
+          tool: just
+
+      - name: Install cargo-mutants
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-mutants
+
+      - name: Run mutation tests
+        run: just ci-mutation
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-results
+          path: mutants.json

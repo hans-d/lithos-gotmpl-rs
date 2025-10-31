@@ -1,0 +1,23 @@
+lithos-gotmpl-rs
+Copyright (c) 2025 Hans Donner
+
+This project is not affiliated with or endorsed by the Go project or
+Masterminds. It aims to provide a Rust implementation inspired by the
+behaviour of Go's `text/template` package and the `sprig` helper library.
+
+This distribution bundles or references test data and tooling that are based on
+third-party works:
+
+1. Go programming language (`text/template`) — Copyright (c) 2009 The Go
+   Authors. Licensed under the BSD 3-Clause License. See
+   https://golang.org/LICENSE for details. Portions of the Go test suite are
+   used to inform compatibility expectations and documentation.
+
+2. Masterminds/sprig v3 — Licensed under the Apache License 2.0. See
+   https://github.com/Masterminds/sprig/blob/master/LICENSE for details. The
+   Go-based `go-sanity` utility in this repository invokes this library to
+   cross-check helper semantics.
+
+Please refer to the respective upstream projects for the complete license
+texts. Copies of the Apache License 2.0 and MIT License applicable to this
+project are provided in `LICENSE-APACHE` and `LICENSE-MIT`.

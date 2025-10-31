@@ -1,0 +1,23 @@
+[workspace]
+pr_label = "release"
+changelog_update = false
+
+[git]
+remote = "origin"
+
+[packages]
+
+[packages.lithos-gotmpl-engine]
+release = true
+publish = false
+
+[packages.lithos-gotmpl-core]
+release = true
+publish = false
+
+[packages.lithos-sprig]
+release = true
+publish = false
+
+[release]
+tag_prefix = ""

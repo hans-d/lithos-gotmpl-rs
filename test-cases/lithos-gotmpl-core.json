@@ -1,0 +1,135 @@
+[
+  {
+    "name": "exec-eq-true",
+    "source": {
+      "file": "src/text/template/exec_test.go",
+      "case": "eq true true",
+      "repo": "https://github.com/golang/go"
+    },
+    "template": "{{eq true true}}",
+    "expected": "true"
+  },
+  {
+    "name": "exec-ne",
+    "source": {
+      "file": "src/text/template/exec_test.go",
+      "case": "ne 1 2",
+      "repo": "https://github.com/golang/go"
+    },
+    "template": "{{ne 1 2}}",
+    "expected": "true"
+  },
+  {
+    "name": "exec-lt",
+    "source": {
+      "file": "src/text/template/exec_test.go",
+      "case": "lt 1 2",
+      "repo": "https://github.com/golang/go"
+    },
+    "template": "{{lt 1 2}}",
+    "expected": "true"
+  },
+  {
+    "name": "exec-ge",
+    "source": {
+      "file": "src/text/template/exec_test.go",
+      "case": "ge 2 1",
+      "repo": "https://github.com/golang/go"
+    },
+    "template": "{{ge 2 1}}",
+    "expected": "true"
+  },
+  {
+    "name": "exec-printf",
+    "source": {
+      "file": "src/text/template/exec_test.go",
+      "case": "printf field",
+      "repo": "https://github.com/golang/go"
+    },
+    "template": "{{printf \"Hello, %s\" .name}}",
+    "data": {"name": "Sprig"},
+    "expected": "Hello, Sprig"
+  },
+  {
+    "name": "exec-printf-with-index",
+    "source": {
+      "file": "src/text/template/exec_test.go",
+      "case": "pipeline",
+      "repo": "https://github.com/golang/go"
+    },
+    "template": "{{index .names 1 | printf \"Hello, %s\"}}",
+    "data": {"names": ["zero", "one"]},
+    "expected": "Hello, one"
+  },
+  {
+    "name": "exec-index-map",
+    "source": {
+      "file": "src/text/template/exec_test.go",
+      "case": "map .one",
+      "repo": "https://github.com/golang/go"
+    },
+    "template": "{{index .items \"two\"}}",
+    "data": {"items": {"one": 1, "two": 2}},
+    "expected": "2"
+  },
+  {
+    "name": "exec-len-string",
+    "source": {
+      "file": "src/text/template/exec_test.go",
+      "case": "len",
+      "repo": "https://github.com/golang/go"
+    },
+    "template": "{{len \"gopher\"}}",
+    "expected": "6"
+  },
+  {
+    "name": "exec-slice-string",
+    "source": {
+      "file": "src/text/template/exec_test.go",
+      "case": "slice",
+      "repo": "https://github.com/golang/go"
+    },
+    "template": "{{slice \"gopher\" \"1\" \"3\"}}",
+    "expected": "op"
+  },
+  {
+    "name": "exec-and",
+    "source": {
+      "file": "src/text/template/exec_test.go",
+      "case": "and",
+      "repo": "https://github.com/golang/go"
+    },
+    "template": "{{and 1 1}}",
+    "expected": "1"
+  },
+  {
+    "name": "exec-or",
+    "source": {
+      "file": "src/text/template/exec_test.go",
+      "case": "or",
+      "repo": "https://github.com/golang/go"
+    },
+    "template": "{{or 0 1}}",
+    "expected": "1"
+  },
+  {
+    "name": "exec-not",
+    "source": {
+      "file": "src/text/template/exec_test.go",
+      "case": "not",
+      "repo": "https://github.com/golang/go"
+    },
+    "template": "{{not false}}",
+    "expected": "true"
+  },
+  {
+    "name": "exec-call-print",
+    "source": {
+      "file": "src/text/template/exec_test.go",
+      "case": "call",
+      "repo": "https://github.com/golang/go"
+    },
+    "template": "{{call \"print\" \"Hello\"}}",
+    "expected": "Hello"
+  }
+]

@@ -1,0 +1,20 @@
+[
+  {
+    "name": "assign-updates-binding",
+    "template": "{{ $v := \"first\" }}{{ $v = \"second\" }}{{ $v }}",
+    "data": {},
+    "expected": "second"
+  },
+  {
+    "name": "nested-range-if",
+    "template": "{{ range $i, $v := .items }}{{ if $v.show }}{{$i}}:{{$v.value}};{{ end }}{{ end }}",
+    "data": {
+      "items": [
+        { "show": true, "value": "A" },
+        { "show": false, "value": "B" },
+        { "show": true, "value": "C" }
+      ]
+    },
+    "expected": "0:A;2:C;"
+  }
+]

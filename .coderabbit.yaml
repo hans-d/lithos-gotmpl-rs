@@ -1,0 +1,35 @@
+---
+language: en-US
+tone_instructions: ""
+early_access: true
+enable_free_tier: true
+reviews:
+  profile: chill
+  high_level_summary: true
+  high_level_summary_placeholder: "@coderabbitai summary"
+  auto_review:
+    enabled: true
+    base_branches:
+      - main
+      - master
+    drafts: false
+    labels: []
+  path_instructions:
+    - path: "crates/**/*.rs"
+      instructions: |
+        Focus on Rust 2021 idioms, flag unsafe usage, and highlight missing tests.
+    - path: "go-sanity/**/*.go"
+      instructions: |
+        Ensure parity with upstream sprig helpers and note deviations in fixtures.
+  finishing_touches:
+    docstrings:
+      enabled: true
+    unit_tests:
+      enabled: false
+  tools:
+    golangci-lint:
+      enabled: true
+    yamllint:
+      enabled: true
+    actionlint:
+      enabled: true

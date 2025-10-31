@@ -1,0 +1,15 @@
+extends: default
+
+ignore: |
+  target/
+  fuzz/target/
+  fuzz/corpus/
+  fuzz/artifacts/
+
+rules:
+  line-length:
+    max: 100
+    level: warning
+  truthy:
+    level: warning
+  document-start: disable
