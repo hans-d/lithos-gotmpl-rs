@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
-use lithos_gotmpl_engine::{Error, EvalContext};
-use serde_json::Value;
+use lithos_gotmpl_engine::{coerce_number, Error, EvalContext};
+use serde_json::{Number, Value};
 
 use super::{expect_array, expect_exact_args, expect_min_args};
 
@@ -18,7 +18,9 @@ pub fn register(builder: &mut lithos_gotmpl_engine::FunctionRegistryBuilder) {
         .register("compact", compact)
         .register("uniq", uniq)
         .register("without", without)
-        .register("has", has);
+        .register("has", has)
+        .register("max", max)
+        .register("min", min);
 }
 
 pub fn list(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
@@ -133,6 +135,76 @@ pub fn has(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
     Ok(Value::Bool(result))
 }
 
+pub fn max(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
+    find_extreme("max", args, |candidate, current| candidate > current)
+}
+
+pub fn min(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
+    find_extreme("min", args, |candidate, current| candidate < current)
+}
+
+fn find_extreme<F>(name: &'static str, args: &[Value], better: F) -> Result<Value, Error>
+where
+    F: Fn(f64, f64) -> bool,
+{
+    let values = collect_numeric_inputs(name, args)?;
+    let mut iter = values.into_iter();
+    let mut best_score = match iter.next() {
+        Some((value, position)) => to_number(name, position, &value)?,
+        None => {
+            return Err(Error::render(
+                format!("{name} requires at least one numeric value"),
+                None,
+            ))
+        }
+    };
+
+    for (value, position) in iter {
+        let score = to_number(name, position, &value)?;
+        if better(score, best_score) {
+            best_score = score;
+        }
+    }
+
+    Ok(score_to_value(best_score))
+}
+
+fn collect_numeric_inputs(
+    name: &'static str,
+    args: &[Value],
+) -> Result<Vec<(Value, usize)>, Error> {
+    if args.is_empty() {
+        return Err(Error::render(
+            format!("{name} requires at least one argument"),
+            None,
+        ));
+    }
+
+    Ok(args
+        .iter()
+        .enumerate()
+        .map(|(idx, value)| (value.clone(), idx + 1))
+        .collect())
+}
+
+fn to_number(name: &'static str, position: usize, value: &Value) -> Result<f64, Error> {
+    if value.is_array() {
+        return Ok(0.0);
+    }
+    coerce_number(value)
+        .map_err(|_| Error::render(format!("{name} argument {position} must be numeric"), None))
+}
+
+fn score_to_value(score: f64) -> Value {
+    if (score.fract() - 0.0).abs() < f64::EPSILON {
+        Value::Number(Number::from(score as i64))
+    } else if let Some(num) = Number::from_f64(score) {
+        Value::Number(num)
+    } else {
+        Value::Null
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -181,5 +253,33 @@ mod tests {
             err.to_string(),
             "render error: has expects a string or array as the second argument"
         );
+    }
+
+    #[test]
+    fn max_over_variadic_args() {
+        let mut ctx = ctx();
+        let out = super::max(&mut ctx, &[json!(1), json!(5), json!(3)]).unwrap();
+        assert_eq!(out, json!(5));
+    }
+
+    #[test]
+    fn min_over_list_argument() {
+        let mut ctx = ctx();
+        let out = super::min(&mut ctx, &[json!([4, 2, 9])]).unwrap();
+        assert_eq!(out, json!(0));
+    }
+
+    #[test]
+    fn min_over_variadic_args() {
+        let mut ctx = ctx();
+        let out = super::min(&mut ctx, &[json!(4), json!(2), json!(9)]).unwrap();
+        assert_eq!(out, json!(2));
+    }
+
+    #[test]
+    fn max_errors_on_non_numeric() {
+        let mut ctx = ctx();
+        let err = super::max(&mut ctx, &[json!("foo"), json!(1.0)]);
+        assert!(err.is_err());
     }
 }

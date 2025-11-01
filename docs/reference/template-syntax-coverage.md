@@ -12,7 +12,7 @@ coverage; ❌ not implemented yet.
 | Assignment (`$v = ...`) to existing vars | ✅ | `tests::assignment_updates_existing_variable` | Parser accepts reassignment and runtime updates the binding. |
 | Multiple declaration (`{{ range $i, $v := ... }}`) | ✅ | `tests::range_assigns_iteration_variables` | Covers key/value binding during range iteration. |
 | Parenthesised pipeline expressions (`(.x | ... )`) | ✅ | `tests::pipeline_expression_inside_if`, `test-cases/lithos-sprig.json` (`default-with-nested-pipeline`) | Nested pipelines inside expressions evaluate correctly. |
-| Else-if (`{{else if .cond}}`) | ❌ | — | Parser currently errors with "else-if is not yet supported". |
+| Else-if (`{{else if .cond}}`) | ✅ | `test-cases/lithos-gotmpl-engine.json` (`if-else-if-chain`), `tests::analysis_reports_else_if_functions` | Supports chained branches with per-branch pipelines. |
 
 ## Control Structures
 

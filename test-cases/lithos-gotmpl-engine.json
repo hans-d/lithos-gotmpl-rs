@@ -28,5 +28,14 @@
     "template": "{{/* comment with ` unmatched */}}",
     "data": {},
     "expected": ""
+  },
+  {
+    "name": "if-else-if-chain",
+    "template": "{{ if .primary }}A{{ else if .secondary }}B{{ else }}C{{ end }}",
+    "data": {
+      "primary": false,
+      "secondary": true
+    },
+    "expected": "B"
   }
 ]
