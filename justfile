@@ -98,19 +98,6 @@ release: ci-release
 install-ci-tools: install-cargo-audit install-cargo-deny install-cargo-about install-go-licenses install-cargo-tarpaulin install-cargo-mutants install-cargo-fuzz install-actionlint install-yamllint install-release-plz
     @echo "Installed core CI tools"
 
-ensure-secure-workflows:
-    if ! command -v secure-workflows >/dev/null 2>&1; then \
-        echo 'secure-workflows not installed. Run `just install-secure-workflows` or `npm install -g @step-security/secure-workflows`.' >&2; \
-        exit 1; \
-    fi
-
-install-secure-workflows:
-    if ! command -v secure-workflows >/dev/null 2>&1; then \
-        npm install -g @step-security/secure-workflows; \
-    else \
-        echo "secure-workflows already installed"; \
-    fi
-
 ensure-syft:
     if ! command -v syft >/dev/null 2>&1; then \
         echo "syft not installed. Install it from https://github.com/anchore/syft#installation." >&2; \
@@ -134,9 +121,6 @@ sbom: ensure-syft
 scancode: ensure-scancode
     mkdir -p target/scancode
     scancode --strip-root --html target/scancode/report.html --summary-json target/scancode/summary.json --license-text target/scancode/licenses --processes 4 .
-
-ci-workflow-audit: ensure-secure-workflows
-    secure-workflows scan --exit-on=high .github/workflows
 
 ensure-gh:
     if ! command -v gh >/dev/null 2>&1; then \

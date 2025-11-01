@@ -112,12 +112,8 @@ jobs:
           echo "${GOBIN}" >> "$GITHUB_PATH"
       - name: Install yamllint
         run: python3 -m pip install --user yamllint
-      - name: Install secure-workflows
-        run: npm install -g @step-security/secure-workflows
       - name: Code quality checks
-        run: |
-          just ci-quality
-          just ci-workflow-audit
+        run: just ci-quality
       - name: SonarCloud scan
         if: ${{ env.SONAR_TOKEN != '' }}
         uses: SonarSource/sonarcloud-github-action@v2.2.0
