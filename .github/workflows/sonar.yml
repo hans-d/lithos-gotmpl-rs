@@ -59,7 +59,7 @@ jobs:
 
       - name: SonarQube analysis
         # yamllint disable-line rule:comments
-        uses: SonarSource/sonarcloud-github-action@v2.2.0
+        uses: SonarSource/sonarcloud-github-action@e44258b109568baa0df60ed515909fc6c72cba92 # v2.3.0
         if: ${{ env.SONAR_TOKEN != '' }}
         env:
           SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
