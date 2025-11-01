@@ -14,7 +14,8 @@ defaults:
   run:
     shell: bash
 
-"on":
+# yamllint disable-line rule:truthy
+on:
   push:
     branches:
       - main
@@ -26,9 +27,6 @@ jobs:
   sonar:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
     steps:
       - name: Harden runner
         # yamllint disable-line rule:comments
@@ -37,30 +35,12 @@ jobs:
           egress-policy: audit
       - name: Checkout repository
         # yamllint disable-line rule:comments
-        uses: actions/checkout@v4.1.6
-
-      - name: Set up Rust
-        # yamllint disable-line rule:comments
-        uses: dtolnay/rust-toolchain@v1
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
-          toolchain: stable
-
-      - name: Set up Go
-        # yamllint disable-line rule:comments
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
-        with:
-          go-version-file: go-sanity/go.mod
-          cache: true
-          check-latest: true
-          cache-dependency-path: go-sanity/go.sum
-
-      - name: Build and test
-        run: cargo test --workspace --all-features
-
+          # Disabling shallow clones is recommended for improving the relevancy of reporting
+          fetch-depth: 0
       - name: SonarQube analysis
         # yamllint disable-line rule:comments
-        uses: SonarSource/sonarcloud-github-action@v2.2.0
-        if: ${{ env.SONAR_TOKEN != '' }}
+        uses: SonarSource/sonarqube-scan-action@v6.0.0
         env:
-          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
