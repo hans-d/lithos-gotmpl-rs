@@ -3,3 +3,4 @@
 /fuzz/corpus
 /fuzz/coverage
 /fuzz/target
+.envrc

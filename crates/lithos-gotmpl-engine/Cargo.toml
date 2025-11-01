@@ -4,6 +4,13 @@ version = "0.1.0"
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
+description = "Go text/template-inspired parser and evaluator used by the Lithos templating stack."
+repository = "https://github.com/hans-d/lithos-gotmpl-rs"
+homepage = "https://github.com/hans-d/lithos-gotmpl-rs"
+documentation = "https://docs.rs/lithos-gotmpl-engine"
+readme = "../../README.md"
+keywords = ["template", "gotmpl", "text-template", "lithos"]
+categories = ["template-engine"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

@@ -4,6 +4,13 @@ version = "0.1.0"
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
+description = "Core helpers and runtime wiring for lithos-gotmpl-engine, mirroring Go's built-in template functions."
+repository = "https://github.com/hans-d/lithos-gotmpl-rs"
+homepage = "https://github.com/hans-d/lithos-gotmpl-rs"
+documentation = "https://docs.rs/lithos-gotmpl-core"
+readme = "../../README.md"
+keywords = ["template", "gotmpl", "text-template", "helpers", "lithos"]
+categories = ["template-engine"]
 
 [dependencies]
 lithos-gotmpl-engine = { workspace = true }
