@@ -7,8 +7,7 @@ name: CodeQL
     branches: [main, master]
   schedule:
     - cron: '0 6 * * 1'
-
-workflow_dispatch: {}
+  workflow_dispatch: {}
 
 permissions:
   contents: read
