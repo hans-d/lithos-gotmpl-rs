@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
 ---
 name: CI
 
@@ -13,7 +14,7 @@ defaults:
   run:
     shell: bash
 
-'on':
+"on":
   push:
     branches:
       - main
@@ -25,20 +26,71 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  test:
-    name: Test Suite
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ steps.filter.outputs.rust }}
+      go: ${{ steps.filter.outputs.go }}
+      lint: ${{ steps.filter.outputs.lint }}
+      deps: ${{ steps.filter.outputs.deps }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4.1.6
+      - name: Compute path filters
+        id: filter
+        # yamllint disable-line rule:comments
+        uses: step-security/paths-filter@v3.0.5
+        with:
+          filters: |
+            rust:
+              - 'Cargo.lock'
+              - 'Cargo.toml'
+              - 'Justfile'
+              - 'crates/**'
+              - 'test-cases/**'
+              - 'fixtures/**'
+              - '.github/workflows/ci.yml'
+            go:
+              - 'go-sanity/**'
+              - 'test-cases/**'
+              - 'fixtures/**'
+              - '.github/workflows/ci.yml'
+            lint:
+              - '.github/workflows/**'
+              - '.yamllint.yaml'
+              - '.github/renovate.json'
+            deps:
+              - 'Cargo.lock'
+              - 'Cargo.toml'
+              - 'Justfile'
+              - 'deny.toml'
+              - 'go-sanity/go.mod'
+              - 'go-sanity/go.sum'
+              - '.github/workflows/**'
+  rust-tests:
+    name: Rust Test Suite
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
-      - uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+      - name: Harden runner
+        # yamllint disable-line rule:comments
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
         with:
           egress-policy: audit
-      - uses: actions/checkout@v4.1.6
+      - name: Checkout repository
+        # yamllint disable-line rule:comments
+        uses: actions/checkout@v4.1.6
       - name: Set up Rust
+        # yamllint disable-line rule:comments
         uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
-      - uses: step-security/rust-cache@v2.8.2
+      - name: Cache Rust tooling
+        # yamllint disable-line rule:comments
+        uses: step-security/rust-cache@v2.8.2
       - name: Install just
         run: |
           if ! command -v just >/dev/null 2>&1; then
@@ -47,21 +99,33 @@ jobs:
       - name: Run unit tests
         run: just ci-test
 
-  behavior:
-    name: Behavioral Validation
+  go-tests:
+    name: Go & Compatibility Tests
+    needs: changes
+    if: >-
+      needs.changes.outputs.go == 'true' ||
+      needs.changes.outputs.rust == 'true'
     timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
-      - uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+      - name: Harden runner
+        # yamllint disable-line rule:comments
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
         with:
           egress-policy: audit
-      - uses: actions/checkout@v4.1.6
+      - name: Checkout repository
+        # yamllint disable-line rule:comments
+        uses: actions/checkout@v4.1.6
       - name: Set up Rust
+        # yamllint disable-line rule:comments
         uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
-      - uses: step-security/rust-cache@v2.8.2
+      - name: Cache Rust tooling
+        # yamllint disable-line rule:comments
+        uses: step-security/rust-cache@v2.8.2
       - name: Set up Go
+        # yamllint disable-line rule:comments
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: go-sanity/go.mod
@@ -73,39 +137,62 @@ jobs:
           if ! command -v just >/dev/null 2>&1; then
             curl -LsSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
           fi
-      - name: Behavioral checks
+      - name: Run Go sanity suite
+        run: just go-sanity
+      - name: Run compatibility tests
         run: just ci-behavior
 
   quality:
-    name: Code Quality
+    name: Rust Quality Checks
+    needs: changes
+    if: needs.changes.outputs.rust == 'true' || github.event_name != 'pull_request'
     timeout-minutes: 30
     runs-on: ubuntu-latest
-    env:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
     steps:
-      - uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+      - name: Harden runner
+        # yamllint disable-line rule:comments
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
         with:
           egress-policy: audit
-      - uses: actions/checkout@v4.1.6
+      - name: Checkout repository
+        # yamllint disable-line rule:comments
+        uses: actions/checkout@v4.1.6
       - name: Set up Rust
+        # yamllint disable-line rule:comments
         uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
           components: rustfmt, clippy
+      - name: Cache Rust tooling
+        # yamllint disable-line rule:comments
+        uses: step-security/rust-cache@v2.8.2
+      - name: Format check
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --all-features
+
+  lint:
+    name: Workflow Linters
+    needs: changes
+    if: needs.changes.outputs.lint == 'true' || github.event_name != 'pull_request'
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        # yamllint disable-line rule:comments
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        with:
+          egress-policy: audit
+      - name: Checkout repository
+        uses: actions/checkout@v4.1.6
       - name: Set up Go
+        # yamllint disable-line rule:comments
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: go-sanity/go.mod
           cache: true
           check-latest: true
           cache-dependency-path: go-sanity/go.sum
-      - uses: step-security/rust-cache@v2.8.2
-      - name: Install just
-        run: |
-          if ! command -v just >/dev/null 2>&1; then
-            curl -LsSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
-          fi
       - name: Install actionlint
         env:
           GOBIN: ${{ runner.temp }}/bin
@@ -113,102 +200,159 @@ jobs:
           go install github.com/rhysd/actionlint/cmd/actionlint@latest
           echo "${GOBIN}" >> "$GITHUB_PATH"
       - name: Install yamllint
-        run: python3 -m pip install --user yamllint
-      - name: Code quality checks
-        run: just ci-quality
-      - name: SonarCloud scan
-        if: ${{ env.SONAR_TOKEN != '' }}
-        uses: SonarSource/sonarcloud-github-action@v2.2.0
-        env:
-          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_HOST_URL: ${{ env.SONAR_HOST_URL }}
+        run: |
+          python3 -m pip install --user yamllint
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Run actionlint
+        run: actionlint
+      - name: Run yamllint
+        run: yamllint -c .yamllint.yaml .
 
-  dependencies:
-    name: Dependency Checks
+  deps-rust:
+    name: Rust Dependency Checks
+    needs: changes
+    if: >-
+      needs.changes.outputs.deps == 'true' ||
+      needs.changes.outputs.rust == 'true' ||
+      github.event_name != 'pull_request'
     timeout-minutes: 25
     runs-on: ubuntu-latest
     steps:
-      - uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+      - name: Harden runner
+        # yamllint disable-line rule:comments
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
         with:
           egress-policy: audit
-      - uses: actions/checkout@v4.1.6
+      - name: Checkout repository
+        uses: actions/checkout@v4.1.6
       - name: Set up Rust
+        # yamllint disable-line rule:comments
         uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
-      - uses: step-security/rust-cache@v2.8.2
-      - name: Set up Go
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
-        with:
-          go-version-file: go-sanity/go.mod
-          cache: true
-          check-latest: true
-          cache-dependency-path: go-sanity/go.sum
-      - name: Install just & Cargo tools
+      - name: Install cargo-audit and cargo-deny
         run: |
-          if ! command -v just >/dev/null 2>&1; then
-            curl -LsSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
-          fi
           if ! command -v cargo-audit >/dev/null 2>&1; then
             cargo install --locked cargo-audit
           fi
           if ! command -v cargo-deny >/dev/null 2>&1; then
             cargo install --locked cargo-deny
           fi
-      - name: Install go-licenses
-        env:
-          GOBIN: ${{ runner.temp }}/bin
-        run: |
-          go install github.com/google/go-licenses/v2@latest
-          echo "${GOBIN}" >> "$GITHUB_PATH"
-      - name: Dependency review
-        if: github.event_name == 'pull_request'
-        uses: actions/dependency-review-action@40c09b7dc99638e5ddb0bfd91c1673effc064d8a # v4.8.1
-        with:
-          fail-on-severity: high
-          allow-licenses: Apache-2.0,MIT,BSD-2-Clause,BSD-3-Clause,Unicode-DFS-2016,Unicode-3.0,BSL-1.0,LGPL-2.1-or-later
-      - name: Dependency checks
-        run: just ci-dependencies
+      - name: cargo audit
+        run: cargo audit --deny warnings
+      - name: cargo deny
+        run: cargo deny check
 
-  dependencies-full:
-    if: github.event_name != 'pull_request'
-    name: Dependency Completeness
-    timeout-minutes: 35
+  deps-go:
+    name: Go License Checks
+    needs: changes
+    if: >-
+      needs.changes.outputs.deps == 'true' ||
+      needs.changes.outputs.go == 'true' ||
+      github.event_name != 'pull_request'
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     steps:
-      - uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+      - name: Harden runner
+        # yamllint disable-line rule:comments
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
         with:
           egress-policy: audit
-      - uses: actions/checkout@v4.1.6
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: step-security/rust-cache@v2.8.2
+      - name: Checkout repository
+        uses: actions/checkout@v4.1.6
       - name: Set up Go
+        # yamllint disable-line rule:comments
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: go-sanity/go.mod
           cache: true
           check-latest: true
           cache-dependency-path: go-sanity/go.sum
-      - name: Install just & Cargo tools
-        run: |
-          if ! command -v just >/dev/null 2>&1; then
-            curl -LsSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
-          fi
-          if ! command -v cargo-deny >/dev/null 2>&1; then
-            cargo install --locked cargo-deny
-          fi
-          if ! command -v cargo-about >/dev/null 2>&1; then
-            cargo install --locked cargo-about
-          fi
       - name: Install go-licenses
         env:
           GOBIN: ${{ runner.temp }}/bin
         run: |
           go install github.com/google/go-licenses/v2@latest
           echo "${GOBIN}" >> "$GITHUB_PATH"
-      - name: Comprehensive dependency verification
-        run: just ci-dependencies-full
+      - name: go-licenses check
+        run: |
+          mkdir -p target/go-cache
+          allowed='MIT,Apache-2.0,BSD-2-Clause,BSD-3-Clause,Unicode-DFS-2016,Unicode-3.0'
+          (
+            cd go-sanity
+            GOCACHE="$(pwd)/../target/go-cache" \
+              go-licenses check ./... --allowed_licenses "${allowed}"
+          )
+
+  deps-general:
+    name: General Dependency Policies
+    needs: changes
+    if: >-
+      github.event_name == 'pull_request' ||
+      needs.changes.outputs.deps == 'true'
+    timeout-minutes: 25
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        # yamllint disable-line rule:comments
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        with:
+          egress-policy: audit
+      - name: Checkout repository
+        uses: actions/checkout@v4.1.6
+      - name: Dependency review
+        if: github.event_name == 'pull_request'
+        # yamllint disable-line rule:comments
+        uses: actions/dependency-review-action@40c09b7dc99638e5ddb0bfd91c1673effc064d8a # v4.8.1
+        with:
+          fail-on-severity: high
+          allow-licenses: >
+            Apache-2.0,MIT,BSD-2-Clause,BSD-3-Clause,Unicode-DFS-2016,Unicode-3.0,BSL-1.0,LGPL-2.1-or-later
+      - name: Set up Rust (non-PR)
+        if: github.event_name != 'pull_request'
+        # yamllint disable-line rule:comments
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Set up Go (non-PR)
+        if: github.event_name != 'pull_request'
+        # yamllint disable-line rule:comments
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: go-sanity/go.mod
+          cache: true
+          check-latest: true
+          cache-dependency-path: go-sanity/go.sum
+      - name: Install reporting tools
+        if: github.event_name != 'pull_request'
+        run: |
+          if ! command -v cargo-about >/dev/null 2>&1; then
+            cargo install --locked cargo-about
+          fi
+          export GOBIN="${HOME}/go/bin"
+          if ! command -v go-licenses >/dev/null 2>&1; then
+            go install github.com/google/go-licenses/v2@latest
+          fi
+          echo "${GOBIN}" >> "$GITHUB_PATH"
+      - name: Generate license reports
+        if: github.event_name != 'pull_request'
+        run: |
+          mkdir -p target/legal target/go-cache
+          cargo about generate \
+            --workspace \
+            --format json \
+            --fail \
+            --output-file target/legal/cargo-about.json
+          (
+            cd go-sanity
+            GOCACHE="$(pwd)/../target/go-cache" go-licenses report .
+          ) > target/legal/go-licenses.csv
+          rm -rf target/legal/go-licenses
+          mkdir -p target/legal/go-licenses
+          (
+            cd go-sanity
+            GOCACHE="$(pwd)/../target/go-cache" \
+              go-licenses save ./... --save_path ../target/legal/go-licenses --force
+          )
+          python3 scripts/check_licenses.py
+          python3 scripts/check_notice.py
