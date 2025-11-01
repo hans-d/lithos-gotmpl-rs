@@ -25,6 +25,11 @@ repository.
 - When running outside the container, initialize tooling with `just install-ci-tools`.
 - Go binaries (e.g., `actionlint`) are expected under `$(go env GOPATH)/bin`; ensure that directory
   is on `PATH` when invoking just recipes.
+- Do **not** modify `justfile` targets to work around sandboxed shells or missing permissions.
+  Recipes should assume a normal developer environment; handle ad-hoc sandbox quirks manually
+  instead of baking them into the shared automation.
+- GitHub CLI (`gh`) is available; use it for repository setting audits, dependency review checks,
+  or workflow status queries when needed.
 
 ## Coding Standards
 

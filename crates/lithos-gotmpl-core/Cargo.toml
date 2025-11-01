@@ -6,7 +6,7 @@ license.workspace = true
 authors.workspace = true
 
 [dependencies]
-lithos-gotmpl-engine = { path = "../lithos-gotmpl-engine" }
+lithos-gotmpl-engine = { workspace = true }
 serde_json = "1"
 serde = { version = "1", features = ["derive"] }
 

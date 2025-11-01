@@ -18,6 +18,10 @@ third-party works:
    Go-based `go-sanity` utility in this repository invokes this library to
    cross-check helper semantics.
 
+3. unicode-ident crate — Licensed under (MIT OR Apache-2.0) AND Unicode-3.0.
+   The Unicode Data Files it incorporates are covered by the Unicode License.
+   A copy of the Unicode License is provided in `LICENSES/Unicode-3.0.txt`.
+
 Please refer to the respective upstream projects for the complete license
 texts. Copies of the Apache License 2.0 and MIT License applicable to this
 project are provided in `LICENSE-APACHE` and `LICENSE-MIT`.
