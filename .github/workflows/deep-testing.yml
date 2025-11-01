@@ -37,14 +37,14 @@ jobs:
 
       - name: Set up Rust nightly
         # yamllint disable-line rule:comments
-        uses: dtolnay/rust-toolchain@v1
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
         if: ${{ hashFiles('fuzz/Cargo.toml') != '' }}
         with:
           toolchain: nightly
 
       - name: Cache Rust tooling
         # yamllint disable-line rule:comments
-        uses: step-security/rust-cache@v2.8.2
+        uses: step-security/rust-cache@f8fba7098297c8c53a7c9a30575ec2ad4ad85056 # v2.8.2
         if: ${{ hashFiles('fuzz/Cargo.toml') != '' }}
 
       - name: Install cargo-fuzz
@@ -88,13 +88,13 @@ jobs:
 
       - name: Set up Rust
         # yamllint disable-line rule:comments
-        uses: dtolnay/rust-toolchain@v1
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
         with:
           toolchain: stable
 
       - name: Cache Rust tooling
         # yamllint disable-line rule:comments
-        uses: step-security/rust-cache@v2.8.2
+        uses: step-security/rust-cache@f8fba7098297c8c53a7c9a30575ec2ad4ad85056 # v2.8.2
 
       - name: Install just & cargo-mutants
         run: |

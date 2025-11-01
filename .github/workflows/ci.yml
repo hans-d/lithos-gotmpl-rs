@@ -41,7 +41,7 @@ jobs:
       - name: Compute path filters
         id: filter
         # yamllint disable-line rule:comments
-        uses: step-security/paths-filter@v3.0.5
+        uses: step-security/paths-filter@6eee183b0d2fd101d3f8ee2935c127bca14c5625 # v3.0.5
         with:
           filters: |
             rust:
@@ -86,12 +86,12 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Set up Rust
         # yamllint disable-line rule:comments
-        uses: dtolnay/rust-toolchain@v1
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
         with:
           toolchain: stable
       - name: Cache Rust tooling
         # yamllint disable-line rule:comments
-        uses: step-security/rust-cache@v2.8.2
+        uses: step-security/rust-cache@f8fba7098297c8c53a7c9a30575ec2ad4ad85056 # v2.8.2
       - name: Install just
         run: |
           if ! command -v just >/dev/null 2>&1; then
@@ -119,12 +119,12 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Set up Rust
         # yamllint disable-line rule:comments
-        uses: dtolnay/rust-toolchain@v1
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
         with:
           toolchain: stable
       - name: Cache Rust tooling
         # yamllint disable-line rule:comments
-        uses: step-security/rust-cache@v2.8.2
+        uses: step-security/rust-cache@f8fba7098297c8c53a7c9a30575ec2ad4ad85056 # v2.8.2
       - name: Set up Go
         # yamllint disable-line rule:comments
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
@@ -160,13 +160,13 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Set up Rust
         # yamllint disable-line rule:comments
-        uses: dtolnay/rust-toolchain@v1
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
         with:
           toolchain: stable
           components: rustfmt, clippy
       - name: Cache Rust tooling
         # yamllint disable-line rule:comments
-        uses: step-security/rust-cache@v2.8.2
+        uses: step-security/rust-cache@f8fba7098297c8c53a7c9a30575ec2ad4ad85056 # v2.8.2
       - name: Format check
         run: cargo fmt --all -- --check
       - name: Clippy
@@ -228,7 +228,7 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Set up Rust
         # yamllint disable-line rule:comments
-        uses: dtolnay/rust-toolchain@v1
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
         with:
           toolchain: stable
       - name: Install cargo-audit and cargo-deny
@@ -312,7 +312,7 @@ jobs:
       - name: Set up Rust (non-PR)
         if: github.event_name != 'pull_request'
         # yamllint disable-line rule:comments
-        uses: dtolnay/rust-toolchain@v1
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
         with:
           toolchain: stable
       - name: Set up Go (non-PR)
