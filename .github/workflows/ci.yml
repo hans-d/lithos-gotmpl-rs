@@ -71,7 +71,7 @@ jobs:
       - name: Install actionlint
         run: |
           go install github.com/rhysd/actionlint/cmd/actionlint@latest
-          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
       - name: Install yamllint
         run: python3 -m pip install --user yamllint
       - name: Code quality checks

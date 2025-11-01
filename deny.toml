@@ -1,7 +1,7 @@
 [advisories]
 ignore = []
-informational = ["unmaintained"]
-severity = "deny"
+informational_warnings = ["unmaintained"]
+severity-threshold = "deny"
 
 [licenses]
 allow = [
