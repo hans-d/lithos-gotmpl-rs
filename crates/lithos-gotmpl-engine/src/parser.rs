@@ -124,6 +124,23 @@ pub fn parse_template(name: &str, source: &str) -> Result<Ast, Error> {
                         ActionKind::Else => {
                             handle_else(&mut control_stack, &mut target_stack, window.span)?;
                         }
+                        ActionKind::ElseIf => {
+                            if tokens.len() < 3 {
+                                return Err(Error::parse_with_span(
+                                    "else-if requires a condition",
+                                    window.span,
+                                ));
+                            }
+                            let condition_tokens: Vec<_> = tokens[2..].to_vec();
+                            let condition_pipeline = parse_action_pipeline(&condition_tokens)?;
+                            handle_else_if(
+                                &mut control_stack,
+                                &mut target_stack,
+                                window.span,
+                                condition_tokens,
+                                condition_pipeline,
+                            )?;
+                        }
                         ActionKind::End => {
                             close_control_frame(
                                 &mut root,
@@ -239,6 +256,7 @@ enum ActionKind {
     Range,
     With,
     Else,
+    ElseIf,
     End,
     Regular,
 }
@@ -272,15 +290,11 @@ fn classify_action(tokens: &[Token]) -> Result<ActionKind, Error> {
             }
             Ok(ActionKind::With)
         }
-        TokenKind::Keyword(Keyword::Else) => {
-            if tokens.len() > 1 {
-                return Err(Error::parse(
-                    "else-if is not yet supported",
-                    Some(tokens[1].span),
-                ));
-            }
-            Ok(ActionKind::Else)
-        }
+        TokenKind::Keyword(Keyword::Else) => Ok(if tokens.len() == 1 {
+            ActionKind::Else
+        } else {
+            ActionKind::ElseIf
+        }),
         TokenKind::Keyword(Keyword::End) => {
             if tokens.len() > 1 {
                 return Err(Error::parse(
@@ -299,6 +313,7 @@ enum AppendTarget {
     Root,
     Then(usize),
     Else(usize),
+    ElseIf(usize, usize),
 }
 
 #[derive(Debug)]
@@ -308,6 +323,7 @@ struct ControlFrame {
     tokens: Vec<Token>,
     pipeline: Pipeline,
     then_block: Block,
+    else_if_branches: Vec<ElseIfData>,
     else_block: Option<Block>,
 }
 
@@ -319,9 +335,18 @@ impl ControlFrame {
             tokens,
             pipeline,
             then_block: Block::default(),
+            else_if_branches: Vec::new(),
             else_block: None,
         }
     }
+}
+
+#[derive(Debug)]
+struct ElseIfData {
+    span: Span,
+    tokens: Vec<Token>,
+    pipeline: Pipeline,
+    block: Block,
 }
 
 #[derive(Debug)]
@@ -343,6 +368,11 @@ fn current_block_mut<'a>(
             .else_block
             .as_mut()
             .expect("else block should be initialised"),
+        AppendTarget::ElseIf(frame_idx, branch_idx) => controls[frame_idx]
+            .else_if_branches
+            .get_mut(branch_idx)
+            .map(|branch| &mut branch.block)
+            .expect("else-if branch should be initialised"),
     }
 }
 
@@ -420,6 +450,7 @@ fn handle_else(
 
     let idx = match current {
         AppendTarget::Then(idx) => *idx,
+        AppendTarget::ElseIf(idx, _) => *idx,
         AppendTarget::Else(_) => {
             return Err(Error::parse_with_span("duplicate else block", span));
         }
@@ -439,6 +470,57 @@ fn handle_else(
     Ok(())
 }
 
+fn handle_else_if(
+    controls: &mut Vec<ControlFrame>,
+    targets: &mut Vec<AppendTarget>,
+    span: Span,
+    tokens: Vec<Token>,
+    pipeline: Pipeline,
+) -> Result<(), Error> {
+    if targets.len() <= 1 {
+        return Err(Error::parse_with_span("unexpected else-if", span));
+    }
+
+    let current = targets
+        .last_mut()
+        .ok_or_else(|| Error::parse_with_span("unexpected else-if", span))?;
+
+    let frame_idx = match current {
+        AppendTarget::Then(idx) => *idx,
+        AppendTarget::ElseIf(idx, _) => *idx,
+        AppendTarget::Else(_) => {
+            return Err(Error::parse_with_span("else-if after else", span));
+        }
+        AppendTarget::Root => return Err(Error::parse_with_span("unexpected else-if", span)),
+    };
+
+    let frame = controls
+        .get_mut(frame_idx)
+        .ok_or_else(|| Error::parse_with_span("mismatched else-if", span))?;
+
+    if !matches!(frame.kind, ControlKind::If) {
+        return Err(Error::parse_with_span(
+            "else-if is only valid inside if blocks",
+            span,
+        ));
+    }
+
+    if frame.else_block.is_some() {
+        return Err(Error::parse_with_span("else-if after else", span));
+    }
+
+    let branch_idx = frame.else_if_branches.len();
+    frame.else_if_branches.push(ElseIfData {
+        span,
+        tokens,
+        pipeline,
+        block: Block::default(),
+    });
+
+    *current = AppendTarget::ElseIf(frame_idx, branch_idx);
+    Ok(())
+}
+
 #[allow(clippy::ptr_arg)]
 fn close_control_frame(
     root: &mut Block,
@@ -452,6 +534,7 @@ fn close_control_frame(
 
     let idx = match top {
         AppendTarget::Then(idx) | AppendTarget::Else(idx) => idx,
+        AppendTarget::ElseIf(idx, _) => idx,
         AppendTarget::Root => return Err(Error::parse_with_span("unexpected end", span)),
     };
 
@@ -475,13 +558,26 @@ fn close_control_frame(
         tokens,
         pipeline,
         then_block,
+        else_if_branches,
         else_block,
         ..
     } = frame;
 
+    let if_branches = else_if_branches
+        .into_iter()
+        .map(|branch| {
+            crate::ast::ElseIfBranch::new(branch.span, branch.tokens, branch.pipeline, branch.block)
+        })
+        .collect::<Vec<_>>();
+
     let node = match kind {
         ControlKind::If => Node::If(IfNode::new(
-            full_span, tokens, pipeline, then_block, else_block,
+            full_span,
+            tokens,
+            pipeline,
+            then_block,
+            if_branches,
+            else_block,
         )),
         ControlKind::Range => Node::Range(RangeNode::new(
             full_span, tokens, pipeline, then_block, else_block,

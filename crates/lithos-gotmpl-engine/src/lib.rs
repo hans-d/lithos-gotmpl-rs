@@ -16,8 +16,8 @@ pub use analyze::{
     FunctionSource, Precision, TemplateAnalysis, TemplateCall, VariableAccess, VariableKind,
 };
 pub use ast::{
-    ActionNode, Ast, BindingKind, Block, Command, CommentNode, Expression, IfNode, Node, Pipeline,
-    PipelineDeclarations, RangeNode, Span, TextNode, WithNode,
+    ActionNode, Ast, BindingKind, Block, Command, CommentNode, ElseIfBranch, Expression, IfNode,
+    Node, Pipeline, PipelineDeclarations, RangeNode, Span, TextNode, WithNode,
 };
 pub use error::Error;
 pub use lexer::{Keyword, Operator, Token, TokenKind};
@@ -123,6 +123,12 @@ impl Template {
                     out.push_str(&pipeline_to_string(&if_node.pipeline));
                     out.push_str("}}");
                     Self::write_block(out, &if_node.then_block);
+                    for branch in &if_node.else_if_branches {
+                        out.push_str("{{else if ");
+                        out.push_str(&pipeline_to_string(&branch.pipeline));
+                        out.push_str("}}");
+                        Self::write_block(out, &branch.block);
+                    }
                     if let Some(else_block) = &if_node.else_block {
                         out.push_str("{{else}}");
                         Self::write_block(out, else_block);
@@ -196,8 +202,18 @@ impl Template {
         ctx.apply_bindings(&node.pipeline, &value)?;
         if runtime::is_truthy(&value) {
             Self::render_block(ctx, &node.then_block, output)?;
-        } else if let Some(else_block) = &node.else_block {
-            Self::render_block(ctx, else_block, output)?;
+        } else {
+            for branch in &node.else_if_branches {
+                let branch_value = ctx.eval_pipeline(&branch.pipeline)?;
+                ctx.apply_bindings(&branch.pipeline, &branch_value)?;
+                if runtime::is_truthy(&branch_value) {
+                    Self::render_block(ctx, &branch.block, output)?;
+                    return Ok(());
+                }
+            }
+            if let Some(else_block) = &node.else_block {
+                Self::render_block(ctx, else_block, output)?;
+            }
         }
         Ok(())
     }

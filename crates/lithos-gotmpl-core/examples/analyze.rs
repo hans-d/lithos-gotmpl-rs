@@ -28,6 +28,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             func.name, func.span, func.source
         );
     }
+    if !analysis.unknown_functions.is_empty() {
+        println!("unregistered helpers detected:");
+        for func in &analysis.unknown_functions {
+            println!("- {} @ {:?}", func.name, func.span);
+        }
+    }
 
     let rendered = template.render(&json!({"user": {"name": "Hydros"}}))?;
     println!("rendered: {rendered}");

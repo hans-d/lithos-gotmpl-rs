@@ -32,6 +32,7 @@ fn analysis_reports_variables_and_functions() {
     assert!(fn_names.contains(&"printf"));
     assert!(fn_names.contains(&"default"));
     assert!(fn_names.contains(&"upper"));
+    assert!(report.unknown_functions.is_empty());
 }
 
 #[test]
@@ -59,4 +60,41 @@ fn analysis_reports_control_structures() {
     assert!(kinds.contains(&ControlKind::If));
     assert!(kinds.contains(&ControlKind::With));
     assert!(kinds.contains(&ControlKind::Range));
+}
+
+#[test]
+fn analysis_collects_unknown_functions() {
+    let tmpl =
+        Template::parse_str("unknown-fn", "{{ customFunc .value }}").expect("parse template");
+    let report = tmpl.analyze();
+    assert_eq!(report.functions.len(), 1);
+    assert_eq!(report.unknown_functions.len(), 1);
+    assert_eq!(report.unknown_functions[0].name, "customFunc");
+    assert!(matches!(
+        report.unknown_functions[0].source,
+        lithos_gotmpl_engine::FunctionSource::Unknown
+    ));
+}
+
+#[test]
+fn analysis_reports_else_if_functions() {
+    let mut builder = FunctionRegistryBuilder::new();
+    builder.register("helper", |_ctx, _args| Ok(Value::Bool(true)));
+    let registry = builder.build();
+
+    let tmpl = Template::parse_with_functions(
+        "else-if",
+        "{{ if .primary }}A{{ else if helper .secondary }}B{{ else }}C{{ end }}",
+        registry,
+    )
+    .expect("parse template");
+
+    let report = tmpl.analyze();
+    let helper_calls: Vec<_> = report
+        .functions
+        .iter()
+        .filter(|call| call.name == "helper")
+        .collect();
+    assert_eq!(helper_calls.len(), 1);
+    assert!(report.unknown_functions.is_empty());
 }
