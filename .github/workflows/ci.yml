@@ -62,7 +62,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25.1'
+          go-version-file: go-sanity/go.mod
       - uses: Swatinem/rust-cache@v2
       - name: Install just
         uses: taiki-e/install-action@v2
