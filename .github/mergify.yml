@@ -1,0 +1,6 @@
+# yaml-language-server: $schema=https://docs.mergify.com/mergify-configuration-schema.json
+
+merge_queue:
+  max_parallel_checks: 1
+  reset_on_external_merge: always
+  mode: serial
