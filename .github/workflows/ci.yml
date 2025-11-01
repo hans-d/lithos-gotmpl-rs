@@ -31,6 +31,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: step-security/harden-runner@v2.6.1
+        with:
+          egress-policy: audit
       - uses: actions/checkout@v4.1.6
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@v1
@@ -51,6 +53,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: step-security/harden-runner@v2.6.1
+        with:
+          egress-policy: audit
       - uses: actions/checkout@v4.1.6
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@v1
@@ -80,6 +84,8 @@ jobs:
       SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
     steps:
       - uses: step-security/harden-runner@v2.6.1
+        with:
+          egress-policy: audit
       - uses: actions/checkout@v4.1.6
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@v1
@@ -126,6 +132,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: step-security/harden-runner@v2.6.1
+        with:
+          egress-policy: audit
       - uses: actions/checkout@v4.1.6
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@v1
@@ -179,6 +187,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: step-security/harden-runner@v2.6.1
+        with:
+          egress-policy: audit
       - uses: actions/checkout@v4.1.6
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@v1

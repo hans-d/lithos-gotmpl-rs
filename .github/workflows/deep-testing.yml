@@ -24,6 +24,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: step-security/harden-runner@v2.6.1
+        with:
+          egress-policy: audit
       - uses: actions/checkout@v4.1.6
         if: ${{ hashFiles('fuzz/Cargo.toml') != '' }}
 
@@ -66,6 +68,8 @@ jobs:
       github.event.schedule == '0 0 1 * *'
     steps:
       - uses: step-security/harden-runner@v2.6.1
+        with:
+          egress-policy: audit
       - uses: actions/checkout@v4.1.6
 
       - name: Set up Rust
