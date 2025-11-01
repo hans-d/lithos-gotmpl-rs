@@ -7,7 +7,7 @@
       "profile": "minimal"
     },
     "ghcr.io/devcontainers/features/go:1": {
-      "version": "1.25.1"
+      "version": "1.25.3"
     },
     "ghcr.io/devcontainers/features/python:1": {
       "version": "3.12"
