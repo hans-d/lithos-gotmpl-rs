@@ -48,6 +48,7 @@ jobs:
           go-version-file: go-sanity/go.mod
           cache: true
           check-latest: true
+          cache-dependency-path: go-sanity/go.sum
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@v1
