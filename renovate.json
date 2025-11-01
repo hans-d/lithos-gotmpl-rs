@@ -2,33 +2,23 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended",
-    "github-actions:pinDigests",
+    "helpers:pinGitHubActionDigests",
     "docker:pinDigests"
   ],
-  "timezone": "Etc/UTC",
+  "timezone": "UTC",
   "prConcurrentLimit": 5,
-  "labels": [
-    "dependencies"
-  ],
+  "labels": ["dependencies"],
   "reviewersFromCodeOwners": true,
   "packageRules": [
     {
-      "matchManagers": [
-        "cargo"
-      ],
+      "matchManagers": ["cargo"],
       "groupName": "cargo dependencies",
-      "schedule": [
-        "before 6am on monday"
-      ]
+      "schedule": ["before 6am on monday"]
     },
     {
-      "matchManagers": [
-        "gomod"
-      ],
+      "matchManagers": ["gomod"],
       "groupName": "go modules",
-      "schedule": [
-        "before 6am on monday"
-      ]
+      "schedule": ["before 6am on monday"]
     }
   ]
 }
