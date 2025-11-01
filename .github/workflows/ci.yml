@@ -37,7 +37,7 @@ jobs:
       deps: ${{ steps.filter.outputs.deps }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4.1.6
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Compute path filters
         id: filter
         # yamllint disable-line rule:comments
@@ -83,7 +83,7 @@ jobs:
           egress-policy: audit
       - name: Checkout repository
         # yamllint disable-line rule:comments
-        uses: actions/checkout@v4.1.6
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Set up Rust
         # yamllint disable-line rule:comments
         uses: dtolnay/rust-toolchain@v1
@@ -116,7 +116,7 @@ jobs:
           egress-policy: audit
       - name: Checkout repository
         # yamllint disable-line rule:comments
-        uses: actions/checkout@v4.1.6
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Set up Rust
         # yamllint disable-line rule:comments
         uses: dtolnay/rust-toolchain@v1
@@ -157,7 +157,7 @@ jobs:
           egress-policy: audit
       - name: Checkout repository
         # yamllint disable-line rule:comments
-        uses: actions/checkout@v4.1.6
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Set up Rust
         # yamllint disable-line rule:comments
         uses: dtolnay/rust-toolchain@v1
@@ -185,7 +185,7 @@ jobs:
         with:
           egress-policy: audit
       - name: Checkout repository
-        uses: actions/checkout@v4.1.6
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Set up Go
         # yamllint disable-line rule:comments
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
@@ -225,7 +225,7 @@ jobs:
         with:
           egress-policy: audit
       - name: Checkout repository
-        uses: actions/checkout@v4.1.6
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Set up Rust
         # yamllint disable-line rule:comments
         uses: dtolnay/rust-toolchain@v1
@@ -260,7 +260,7 @@ jobs:
         with:
           egress-policy: audit
       - name: Checkout repository
-        uses: actions/checkout@v4.1.6
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Set up Go
         # yamllint disable-line rule:comments
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
@@ -300,7 +300,7 @@ jobs:
         with:
           egress-policy: audit
       - name: Checkout repository
-        uses: actions/checkout@v4.1.6
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Dependency review
         if: github.event_name == 'pull_request'
         # yamllint disable-line rule:comments
