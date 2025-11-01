@@ -1,5 +1,5 @@
 [workspace]
-# release notes via githib, not in repo
+# release notes via github, not in repo
 changelog_update = false
 git_release_enable = true
 # renovate manages dependencies
