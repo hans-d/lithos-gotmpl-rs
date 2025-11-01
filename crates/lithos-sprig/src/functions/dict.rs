@@ -13,7 +13,11 @@ pub fn register(builder: &mut lithos_gotmpl_engine::FunctionRegistryBuilder) {
         .register("merge", merge)
         .register("hasKey", has_key)
         .register("keys", keys)
-        .register("values", values);
+        .register("values", values)
+        .register("pick", pick)
+        .register("omit", omit)
+        .register("pluck", pluck)
+        .register("dig", dig);
 }
 
 pub fn dict(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
@@ -98,6 +102,83 @@ pub fn values(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
             .map(|k| map.get(&k).cloned().unwrap_or(Value::Null))
             .collect(),
     ))
+}
+
+pub fn pick(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
+    expect_min_args("pick", args, 2)?;
+    let map = as_object("pick", &args[0])?;
+    let mut result = Map::new();
+    for (idx, key_val) in args[1..].iter().enumerate() {
+        let key = expect_string("pick", key_val, idx + 2)?;
+        if let Some(value) = map.get(&key) {
+            result.insert(key, value.clone());
+        }
+    }
+    Ok(Value::Object(result))
+}
+
+pub fn omit(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
+    expect_min_args("omit", args, 2)?;
+    let mut map = as_object("omit", &args[0])?;
+    for (idx, key_val) in args[1..].iter().enumerate() {
+        let key = expect_string("omit", key_val, idx + 2)?;
+        map.remove(&key);
+    }
+    Ok(Value::Object(map))
+}
+
+pub fn pluck(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
+    expect_min_args("pluck", args, 2)?;
+    let key = expect_string("pluck", &args[0], 1)?;
+    let mut result = Vec::new();
+    for source in &args[1..] {
+        match source {
+            Value::Array(items) => {
+                for item in items {
+                    if let Value::Object(map) = item {
+                        if let Some(value) = map.get(&key) {
+                            result.push(value.clone());
+                        }
+                    }
+                }
+            }
+            Value::Object(map) => {
+                if let Some(value) = map.get(&key) {
+                    result.push(value.clone());
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(Value::Array(result))
+}
+
+pub fn dig(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
+    if args.len() < 3 {
+        return Err(Error::render(
+            format!("dig requires at least three arguments, got {}", args.len()),
+            None,
+        ));
+    }
+    let key_count = args.len() - 2;
+    let mut keys = Vec::with_capacity(key_count);
+    for (idx, value) in args[..key_count].iter().enumerate() {
+        keys.push(expect_string("dig", value, idx + 1)?);
+    }
+    let default_value = args[args.len() - 2].clone();
+    let data = &args[args.len() - 1];
+
+    let mut current = data;
+    for key in keys {
+        match current {
+            Value::Object(map) => match map.get(&key) {
+                Some(next) => current = next,
+                None => return Ok(default_value),
+            },
+            _ => return Ok(default_value),
+        }
+    }
+    Ok(current.clone())
 }
 
 fn as_object(name: &'static str, value: &Value) -> Result<Map<String, Value>, Error> {
@@ -187,5 +268,63 @@ mod tests {
         .unwrap();
         let out = values(&mut ctx, &[map]).unwrap();
         assert_eq!(out, json!([1, 2, 3]));
+    }
+
+    #[test]
+    fn pick_extracts_selected_keys() {
+        let mut ctx = ctx();
+        let map = json!({"foo": 1, "bar": 2, "baz": 3});
+        let out = pick(&mut ctx, &[map, json!("foo"), json!("baz")]).unwrap();
+        assert_eq!(out, json!({"foo": 1, "baz": 3}));
+    }
+
+    #[test]
+    fn omit_removes_keys() {
+        let mut ctx = ctx();
+        let map = json!({"foo": 1, "bar": 2, "baz": 3});
+        let out = omit(&mut ctx, &[map, json!("bar")]).unwrap();
+        assert_eq!(out, json!({"foo": 1, "baz": 3}));
+    }
+
+    #[test]
+    fn pluck_collects_values_across_arrays() {
+        let mut ctx = ctx();
+        let list = json!([
+            {"name": "alpha"},
+            {"name": "beta"},
+            {"other": "ignored"}
+        ]);
+        let out = pluck(&mut ctx, &[json!("name"), list]).unwrap();
+        assert_eq!(out, json!(["alpha", "beta"]));
+
+        let out_maps = pluck(
+            &mut ctx,
+            &[
+                json!("name"),
+                json!({"name": "alpha"}),
+                json!({"name": "beta"}),
+            ],
+        )
+        .unwrap();
+        assert_eq!(out_maps, json!(["alpha", "beta"]));
+    }
+
+    #[test]
+    fn dig_returns_nested_value_or_default() {
+        let mut ctx = ctx();
+        let map = json!({"user": {"profile": {"id": 42}}});
+        let found = dig(
+            &mut ctx,
+            &[json!("user"), json!("profile"), json!(0), map.clone()],
+        )
+        .unwrap();
+        assert_eq!(found, json!({"id": 42}));
+
+        let missing = dig(
+            &mut ctx,
+            &[json!("user"), json!("missing"), json!("fallback"), map],
+        )
+        .unwrap();
+        assert_eq!(missing, json!("fallback"));
     }
 }
