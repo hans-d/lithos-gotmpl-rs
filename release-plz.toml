@@ -1,23 +1,19 @@
 [workspace]
-pr_label = "release"
+# release notes via github, not in repo
 changelog_update = false
+git_release_enable = true
+# renovate manages dependencies
+dependencies_update = false
 
-[git]
-remote = "origin"
 
-[packages]
-
-[packages.lithos-gotmpl-engine]
-release = true
+[[package]]
+name = "lithos-gotmpl-engine"
 publish = false
 
-[packages.lithos-gotmpl-core]
-release = true
+[[package]]
+name = "lithos-gotmpl-core"
 publish = false
 
-[packages.lithos-sprig]
-release = true
+[[package]]
+name = "lithos-sprig"
 publish = false
-
-[release]
-tag_prefix = ""
