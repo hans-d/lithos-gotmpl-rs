@@ -1,0 +1,39 @@
+# yaml-language-server: $schema=https://docs.mergify.com/mergify-configuration-schema.json
+
+queue_rules:
+  - name: pipeline
+    conditions:
+      - -files~=^(?!\.github/|renovate\.json$).+
+    max_concurrent: 1
+    speculative_checks: 0
+  - name: default
+    conditions: []
+    max_concurrent: 1
+    speculative_checks: 0
+
+pull_request_rules:
+  - name: Queue pipeline-only changes
+    conditions:
+      - base~=^(main|master)$
+      - -files~=^(?!\.github/|renovate\.json$).+
+      - check-success=CI / Test Suite
+      - check-success=CI / Behavioral Validation
+      - check-success=CI / Code Quality
+      - check-success=CI / Dependency Checks
+      - check-success=CodeQL / Analyze
+    actions:
+      queue:
+        name: pipeline
+  - name: Queue default changes
+    conditions:
+      - base~=^(main|master)$
+      - -files~=^\.github/.*
+      - -files~=^renovate\.json$
+      - check-success=CI / Test Suite
+      - check-success=CI / Behavioral Validation
+      - check-success=CI / Code Quality
+      - check-success=CI / Dependency Checks
+      - check-success=CodeQL / Analyze
+    actions:
+      queue:
+        name: default
