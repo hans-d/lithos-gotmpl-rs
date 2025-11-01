@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
 name: CodeQL
 
 'on':
@@ -31,18 +32,24 @@ jobs:
       security-events: write
       actions: read
     steps:
-      - uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+      - name: Harden runner
+        # yamllint disable-line rule:comments
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@v4.1.6
+      - name: Checkout repository
+        # yamllint disable-line rule:comments
+        uses: actions/checkout@v4.1.6
 
       - name: Initialize CodeQL
+        # yamllint disable-line rule:comments
         uses: github/codeql-action/init@0499de31b99561a6d14a36a5f662c2a54f91beee # v4.31.2
         with:
           languages: go, rust
 
       - name: Set up Go
+        # yamllint disable-line rule:comments
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: go-sanity/go.mod
@@ -51,12 +58,15 @@ jobs:
           cache-dependency-path: go-sanity/go.sum
 
       - name: Set up Rust
+        # yamllint disable-line rule:comments
         uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
 
       - name: Autobuild
+        # yamllint disable-line rule:comments
         uses: github/codeql-action/autobuild@0499de31b99561a6d14a36a5f662c2a54f91beee # v4.31.2
 
       - name: Perform CodeQL Analysis
+        # yamllint disable-line rule:comments
         uses: github/codeql-action/analyze@0499de31b99561a6d14a36a5f662c2a54f91beee # v4.31.2

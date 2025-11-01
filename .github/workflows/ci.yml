@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
 ---
 name: CI
 
@@ -13,7 +14,7 @@ defaults:
   run:
     shell: bash
 
-'on':
+"on":
   push:
     branches:
       - main
@@ -30,15 +31,22 @@ jobs:
     timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
-      - uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+      - name: Harden runner
+        # yamllint disable-line rule:comments
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
         with:
           egress-policy: audit
-      - uses: actions/checkout@v4.1.6
+      - name: Checkout repository
+        # yamllint disable-line rule:comments
+        uses: actions/checkout@v4.1.6
       - name: Set up Rust
+        # yamllint disable-line rule:comments
         uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
-      - uses: step-security/rust-cache@v2.8.2
+      - name: Cache Rust tooling
+        # yamllint disable-line rule:comments
+        uses: step-security/rust-cache@v2.8.2
       - name: Install just
         run: |
           if ! command -v just >/dev/null 2>&1; then
@@ -52,16 +60,24 @@ jobs:
     timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
-      - uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+      - name: Harden runner
+        # yamllint disable-line rule:comments
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
         with:
           egress-policy: audit
-      - uses: actions/checkout@v4.1.6
+      - name: Checkout repository
+        # yamllint disable-line rule:comments
+        uses: actions/checkout@v4.1.6
       - name: Set up Rust
+        # yamllint disable-line rule:comments
         uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
-      - uses: step-security/rust-cache@v2.8.2
+      - name: Cache Rust tooling
+        # yamllint disable-line rule:comments
+        uses: step-security/rust-cache@v2.8.2
       - name: Set up Go
+        # yamllint disable-line rule:comments
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: go-sanity/go.mod
@@ -84,23 +100,31 @@ jobs:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
     steps:
-      - uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+      - name: Harden runner
+        # yamllint disable-line rule:comments
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
         with:
           egress-policy: audit
-      - uses: actions/checkout@v4.1.6
+      - name: Checkout repository
+        # yamllint disable-line rule:comments
+        uses: actions/checkout@v4.1.6
       - name: Set up Rust
+        # yamllint disable-line rule:comments
         uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
           components: rustfmt, clippy
       - name: Set up Go
+        # yamllint disable-line rule:comments
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: go-sanity/go.mod
           cache: true
           check-latest: true
           cache-dependency-path: go-sanity/go.sum
-      - uses: step-security/rust-cache@v2.8.2
+      - name: Cache Rust tooling
+        # yamllint disable-line rule:comments
+        uses: step-security/rust-cache@v2.8.2
       - name: Install just
         run: |
           if ! command -v just >/dev/null 2>&1; then
@@ -129,16 +153,24 @@ jobs:
     timeout-minutes: 25
     runs-on: ubuntu-latest
     steps:
-      - uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+      - name: Harden runner
+        # yamllint disable-line rule:comments
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
         with:
           egress-policy: audit
-      - uses: actions/checkout@v4.1.6
+      - name: Checkout repository
+        # yamllint disable-line rule:comments
+        uses: actions/checkout@v4.1.6
       - name: Set up Rust
+        # yamllint disable-line rule:comments
         uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
-      - uses: step-security/rust-cache@v2.8.2
+      - name: Cache Rust tooling
+        # yamllint disable-line rule:comments
+        uses: step-security/rust-cache@v2.8.2
       - name: Set up Go
+        # yamllint disable-line rule:comments
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: go-sanity/go.mod
@@ -163,11 +195,13 @@ jobs:
           go install github.com/google/go-licenses/v2@latest
           echo "${GOBIN}" >> "$GITHUB_PATH"
       - name: Dependency review
-        if: github.event_name == 'pull_request'
+        # yamllint disable-line rule:comments
         uses: actions/dependency-review-action@40c09b7dc99638e5ddb0bfd91c1673effc064d8a # v4.8.1
+        if: github.event_name == 'pull_request'
         with:
           fail-on-severity: high
-          allow-licenses: Apache-2.0,MIT,BSD-2-Clause,BSD-3-Clause,Unicode-DFS-2016,Unicode-3.0,BSL-1.0,LGPL-2.1-or-later
+          allow-licenses: >
+            Apache-2.0,MIT,BSD-2-Clause,BSD-3-Clause,Unicode-DFS-2016,Unicode-3.0,BSL-1.0,LGPL-2.1-or-later
       - name: Dependency checks
         run: just ci-dependencies
 
@@ -177,16 +211,23 @@ jobs:
     timeout-minutes: 35
     runs-on: ubuntu-latest
     steps:
-      - uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+      - name: Harden runner
+        # yamllint disable-line rule:comments
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
         with:
           egress-policy: audit
-      - uses: actions/checkout@v4.1.6
+      - name: Checkout repository
+        # yamllint disable-line rule:comments
+        uses: actions/checkout@v4.1.6
       - name: Set up Rust
+        # yamllint disable-line rule:comments
         uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
-      - uses: step-security/rust-cache@v2.8.2
+      - name: Cache Rust tooling
+        uses: step-security/rust-cache@v2.8.2
       - name: Set up Go
+        # yamllint disable-line rule:comments
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: go-sanity/go.mod
