@@ -794,8 +794,42 @@ fn find_action_start(bytes: &[u8], from: usize) -> Option<usize> {
 
 fn find_action_end(bytes: &[u8], from: usize) -> Option<usize> {
     let mut i = from;
+    let mut in_raw = false;
+    let mut in_string = false;
     while i + 1 < bytes.len() {
-        if bytes[i] == b'}' && bytes[i + 1] == b'}' {
+        let current = bytes[i];
+        if in_raw {
+            if current == b'`' {
+                in_raw = false;
+            }
+            i += 1;
+            continue;
+        }
+        if in_string {
+            if current == b'\\' {
+                i += 2;
+                continue;
+            }
+            if current == b'"' {
+                in_string = false;
+            }
+            i += 1;
+            continue;
+        }
+        match current {
+            b'`' => {
+                in_raw = true;
+                i += 1;
+                continue;
+            }
+            b'"' => {
+                in_string = true;
+                i += 1;
+                continue;
+            }
+            _ => {}
+        }
+        if current == b'}' && bytes[i + 1] == b'}' {
             return Some(i);
         }
         i += 1;
@@ -902,6 +936,12 @@ mod tests {
         let err = parse_template("bad-comment", "{{/*}} ")
             .expect_err("expected parser error for unterminated comment");
         assert!(err.to_string().contains("unclosed comment"));
+    }
+
+    #[test]
+    fn parses_raw_string_with_nested_braces() {
+        let src = "{{`{{.settings.bucket_name_suffix}}`}}";
+        parse_template("raw", src).expect("raw string literal with braces should parse");
     }
 
     #[test]
