@@ -35,7 +35,7 @@ jobs:
           egress-policy: audit
       - name: Checkout repository
         # yamllint disable-line rule:comments
-        uses: actions/checkout@v4.1.6
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
         with:
           # Disabling shallow clones is recommended for improving the relevancy of reporting
           fetch-depth: 0
