@@ -1,6 +1,17 @@
 ---
 name: Deep Testing
 
+permissions:
+  contents: read
+
+concurrency:
+  group: deep-testing-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
 'on':
   schedule:
     - cron: "0 0 * * 0"
@@ -9,16 +20,22 @@ name: Deep Testing
 jobs:
   fuzz:
     name: Fuzz Testing
+    timeout-minutes: 45
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: step-security/harden-runner@v2.6.1
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@v4.1.6
         if: ${{ hashFiles('fuzz/Cargo.toml') != '' }}
 
       - name: Set up Rust nightly
         if: ${{ hashFiles('fuzz/Cargo.toml') != '' }}
-        uses: dtolnay/rust-toolchain@nightly
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: nightly
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: step-security/rust-cache@v2.8.2
         if: ${{ hashFiles('fuzz/Cargo.toml') != '' }}
 
       - name: Install cargo-fuzz
@@ -37,40 +54,45 @@ jobs:
 
       - name: Upload corpus if crashes found
         if: ${{ failure() && hashFiles('fuzz/Cargo.toml') != '' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.3.1
         with:
           name: fuzz-artifacts
           path: fuzz/artifacts/
 
   mutation:
     name: Mutation Testing (Monthly)
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     if: >
       github.event_name == 'schedule' &&
       github.event.schedule == '0 0 1 * *'
     steps:
-      - uses: actions/checkout@v4
+      - uses: step-security/harden-runner@v2.6.1
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@v4.1.6
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: Install just
-        uses: taiki-e/install-action@v2
+        uses: dtolnay/rust-toolchain@v1
         with:
-          tool: just
+          toolchain: stable
 
-      - name: Install cargo-mutants
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-mutants
+      - uses: step-security/rust-cache@v2.8.2
+
+      - name: Install just & cargo-mutants
+        run: |
+          if ! command -v just >/dev/null 2>&1; then
+            curl -LsSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+          fi
+          if ! command -v cargo-mutants >/dev/null 2>&1; then
+            cargo install --locked cargo-mutants
+          fi
 
       - name: Run mutation tests
         run: just ci-mutation
 
       - name: Upload results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.3.1
         with:
           name: mutation-results
           path: mutants.json

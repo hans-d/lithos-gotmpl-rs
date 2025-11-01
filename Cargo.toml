@@ -9,6 +9,10 @@ rust-version = "1.70"
 license = "MIT OR Apache-2.0"
 authors = ["Hans Donner <hans@hansdonner.nl>"]
 
+[workspace.dependencies]
+lithos-gotmpl-engine = { version = "0.1.0", path = "crates/lithos-gotmpl-engine" }
+lithos-gotmpl-core = { version = "0.1.0", path = "crates/lithos-gotmpl-core" }
+
 [workspace.metadata.release-plz]
 config-path = "release-plz.toml"
 

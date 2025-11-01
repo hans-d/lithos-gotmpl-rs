@@ -34,9 +34,32 @@ ci-quality: ensure-yamllint
     fi
     yamllint -c .yamllint.yaml .
 
-ci-security: ensure-cargo-audit ensure-cargo-deny
+ci-security: ensure-cargo-audit
     cargo audit --deny warnings
+
+ci-legal: ensure-cargo-deny ensure-go-licenses
     cargo deny check
+    mkdir -p target/go-cache
+    (cd go-sanity && GOCACHE="$(pwd)/../target/go-cache" go-licenses check ./... --allowed_licenses MIT,Apache-2.0,BSD-2-Clause,BSD-3-Clause,Unicode-DFS-2016,Unicode-3.0)
+
+ci-legal-full: ensure-cargo-deny ensure-cargo-about ensure-go-licenses
+    cargo deny check
+    mkdir -p target/legal target/go-cache
+    cargo about generate --workspace --format json --fail --output-file target/legal/cargo-about.json
+    (cd go-sanity && GOCACHE="$(pwd)/../target/go-cache" go-licenses check ./... --allowed_licenses MIT,Apache-2.0,BSD-2-Clause,BSD-3-Clause,Unicode-DFS-2016,Unicode-3.0)
+    (cd go-sanity && GOCACHE="$(pwd)/../target/go-cache" go-licenses report .) > target/legal/go-licenses.csv
+    rm -rf target/legal/go-licenses
+    mkdir -p target/legal/go-licenses
+    (cd go-sanity && GOCACHE="$(pwd)/../target/go-cache" go-licenses save ./... --save_path ../target/legal/go-licenses --force)
+    python3 scripts/check_licenses.py
+    python3 scripts/check_notice.py
+
+ci-dependencies:
+    just ci-security
+    just ci-legal
+
+ci-dependencies-full:
+    just ci-legal-full
 
 ci-mutation: ensure-cargo-mutants
     cargo mutants --workspace --timeout 120 --output mutants.json
@@ -72,7 +95,69 @@ mutation: ci-mutation
 fuzz: ci-fuzz
 release: ci-release
 
-install-ci-tools: install-cargo-audit install-cargo-deny install-cargo-tarpaulin install-cargo-mutants install-cargo-fuzz install-actionlint install-yamllint install-release-plz
+install-ci-tools: install-cargo-audit install-cargo-deny install-cargo-about install-go-licenses install-cargo-tarpaulin install-cargo-mutants install-cargo-fuzz install-actionlint install-yamllint install-release-plz
+    @echo "Installed core CI tools"
+
+ensure-syft:
+    if ! command -v syft >/dev/null 2>&1; then \
+        echo "syft not installed. Install it from https://github.com/anchore/syft#installation." >&2; \
+        exit 1; \
+    fi
+
+ensure-scancode:
+    if ! command -v scancode >/dev/null 2>&1; then \
+        echo "scancode not installed. See https://scancode-toolkit.readthedocs.io/en/latest/getting-started/install.html" >&2; \
+        exit 1; \
+    fi
+
+# Syft SBOM generation ------------------------------------------------------
+
+sbom: ensure-syft
+    mkdir -p target/sbom
+    syft dir:. --output cyclonedx-json=target/sbom/sbom.json
+
+# ScanCode reports ----------------------------------------------------------
+
+scancode: ensure-scancode
+    mkdir -p target/scancode
+    scancode --strip-root --html target/scancode/report.html --summary-json target/scancode/summary.json --license-text target/scancode/licenses --processes 4 .
+
+ensure-gh:
+    if ! command -v gh >/dev/null 2>&1; then \
+        echo "gh CLI not installed. Install from https://cli.github.com/ before running this recipe." >&2; \
+        exit 1; \
+    fi
+
+gh-repo-audit: ensure-gh
+    export GH_PAGER=; \
+    repo=$(gh repo view --json nameWithOwner --jq '.nameWithOwner') && \
+    echo "# Repository security configuration" && \
+    gh api repos/"$repo" --jq '{visibility: .visibility, private: .private, allow_forking: .allow_forking, security_and_analysis: .security_and_analysis, default_workflow_permissions: .default_workflow_permissions}' && \
+    wf_perm=$(gh api repos/"$repo" --jq '.default_workflow_permissions // "unset"') && \
+    if [ "$wf_perm" = "write" ]; then \
+        echo "!! default_workflow_permissions is 'write' (should be 'read')." >&2; \
+    elif [ "$wf_perm" = "unset" ]; then \
+        echo "!! default_workflow_permissions not explicit (uses org default). Consider setting to 'read'." >&2; \
+    fi && \
+    echo "# Actions permissions" && \
+    actions_json=$(gh api repos/"$repo"/actions/permissions) && \
+    echo "$actions_json" | jq '{enabled: .enabled, allowed_actions: .allowed_actions, can_approve_pull_request_reviews: .can_approve_pull_request_reviews}' && \
+    allowed=$(echo "$actions_json" | jq -r '.allowed_actions // "all"') && \
+    if [ "$allowed" = "all" ]; then \
+        echo "!! allowed_actions is 'all' (consider restricting to selected)." >&2; \
+    elif [ "$allowed" = "selected" ]; then \
+        echo "# Selected actions configuration" && \
+        gh api repos/"$repo"/actions/permissions/selected-actions --jq '{github_owned_allowed: .github_owned_allowed, verified_allowed: .verified_allowed, actions: .actions, patterns: .patterns}'; \
+    fi && \
+    echo "# Rulesets" && \
+    gh api repos/"$repo"/rulesets --jq '[.[] | {name: .name, target: .target, enforcement: .enforcement}]' || \
+      echo "(rulesets API unavailable or no rulesets configured)" && \
+    echo "# Branch protection (main)" && \
+    gh api repos/"$repo"/branches/main/protection || \
+      echo "(classic branch protection not configured; see rulesets above)" && \
+    echo "# Merge settings" && \
+    gh api repos/"$repo" --jq '{default_branch: .default_branch, allow_squash_merge: .allow_squash_merge, allow_merge_commit: .allow_merge_commit, allow_rebase_merge: .allow_rebase_merge}' && \
+    echo "# Security advisories (Dependabot alerts require Dependabot; skipped for Renovate workflows)"
 
 ensure-cargo-audit:
     if ! command -v cargo-audit >/dev/null 2>&1; then \
@@ -83,6 +168,18 @@ ensure-cargo-audit:
 ensure-cargo-deny:
     if ! command -v cargo-deny >/dev/null 2>&1; then \
         echo "cargo-deny not installed. Run \`just install-cargo-deny\` or \`cargo install --locked cargo-deny\`." >&2; \
+        exit 1; \
+    fi
+
+ensure-cargo-about:
+    if ! command -v cargo-about >/dev/null 2>&1; then \
+        echo "cargo-about not installed. Run \`just install-cargo-about\` or \`cargo install --locked cargo-about\`." >&2; \
+        exit 1; \
+    fi
+
+ensure-go-licenses:
+    if ! command -v go-licenses >/dev/null 2>&1; then \
+        echo "go-licenses not installed. Run \`just install-go-licenses\` or \`go install github.com/google/go-licenses/v2@latest\`." >&2; \
         exit 1; \
     fi
 
@@ -170,4 +267,18 @@ install-release-plz:
         cargo install release-plz; \
     else \
         echo "release-plz already installed"; \
+    fi
+
+install-cargo-about:
+    if ! command -v cargo-about >/dev/null 2>&1; then \
+        cargo install --locked cargo-about; \
+    else \
+        echo "cargo-about already installed"; \
+    fi
+
+install-go-licenses:
+    if ! command -v go-licenses >/dev/null 2>&1; then \
+        GOBIN="${HOME}/go/bin" go install github.com/google/go-licenses/v2@latest; \
+    else \
+        echo "go-licenses already installed"; \
     fi

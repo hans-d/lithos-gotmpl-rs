@@ -1,0 +1,4 @@
+# Each non-empty, non-comment line must appear verbatim in NOTICE.
+Go programming language (`text/template`)
+Masterminds/sprig v3
+unicode-ident crate

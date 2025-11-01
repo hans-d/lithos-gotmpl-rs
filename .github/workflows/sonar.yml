@@ -1,6 +1,18 @@
 ---
 name: SonarQube
 
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: sonar-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
 'on':
   push:
     branches:
@@ -12,26 +24,35 @@ name: SonarQube
 jobs:
   sonar:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: step-security/harden-runner@v2.6.1
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@v4.1.6
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v5.0.1
         with:
           go-version-file: go-sanity/go.mod
+          cache: true
+          check-latest: true
+          cache-dependency-path: go-sanity/go.sum
 
       - name: Build and test
         run: cargo test --workspace --all-features
 
       - name: SonarQube analysis
         if: ${{ env.SONAR_TOKEN != '' }}
-        uses: SonarSource/sonarcloud-github-action@v2
+        uses: SonarSource/sonarcloud-github-action@v2.2.0
         env:
           SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

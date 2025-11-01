@@ -1,0 +1,62 @@
+name: CodeQL
+
+'on':
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - uses: step-security/harden-runner@v2.6.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@v4.1.6
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3.25.7
+        with:
+          languages: go, rust
+
+      - name: Set up Go
+        uses: actions/setup-go@v5.0.1
+        with:
+          go-version-file: go-sanity/go.mod
+          cache: true
+          check-latest: true
+          cache-dependency-path: go-sanity/go.sum
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3.25.7
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3.25.7

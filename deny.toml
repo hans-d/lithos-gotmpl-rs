@@ -1,7 +1,4 @@
 [advisories]
-vulnerability = "deny"
-unmaintained = "warn"
-yanked = "deny"
 ignore = []
 
 [licenses]
@@ -10,9 +7,9 @@ allow = [
   "MIT",
   "BSD-2-Clause",
   "BSD-3-Clause",
-  "Unicode-DFS-2016"
+  "Unicode-DFS-2016",
+  "Unicode-3.0"
 ]
-default = "deny"
 confidence-threshold = 0.8
 
 [bans]
@@ -22,9 +19,5 @@ wildcards = "warn"
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
-
-[sources.allow-registry]
-crates-io = true
-
-[sources.allow-git]
-
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
