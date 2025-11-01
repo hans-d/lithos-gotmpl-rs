@@ -1,13 +1,14 @@
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
 name: CodeQL
 
-'on':
+# yamllint disable-line rule:truthy
+on:
   push:
     branches: [main, master]
   pull_request:
     branches: [main, master]
   schedule:
-    - cron: '0 6 * * 1'
+    - cron: "0 6 * * 1"
   workflow_dispatch: {}
 
 permissions:
