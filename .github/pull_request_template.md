@@ -1,6 +1,6 @@
 ## Why
 
-<!-- What does this change accomplish? Keep it short and link to issues if applicable. -->
+<!-- Why is this change needed, what problem does it solve? Keep it short and link to issues if applicable. -->
 
 ## Additional Notes
 
