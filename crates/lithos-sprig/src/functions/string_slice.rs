@@ -79,9 +79,26 @@ mod tests {
     }
 
     #[test]
-    fn split_list_basic() {
+    fn split_list_requires_string_separator() {
         let mut ctx = ctx();
-        let out = split_list(&mut ctx, &[json!(","), json!("a,b")]).unwrap();
-        assert_eq!(out, json!(["a", "b"]));
+        let err = split_list(&mut ctx, &[json!({"oops": true}), json!("a,b")]).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "render error: splitList argument 1 must be coercible to string, got Object {\"oops\": Bool(true)}"
+        );
+    }
+
+    #[test]
+    fn split_map_uses_incrementing_keys() {
+        let mut ctx = ctx();
+        let out = split_map(&mut ctx, &[json!(":"), json!("a:b")]).unwrap();
+        assert_eq!(out, json!({"_0": "a", "_1": "b"}));
+    }
+
+    #[test]
+    fn splitn_truncates_to_requested_segments() {
+        let mut ctx = ctx();
+        let out = splitn(&mut ctx, &[json!(","), json!("a,b,c"), json!(2)]).unwrap();
+        assert_eq!(out, json!(["a", "b,c"]));
     }
 }

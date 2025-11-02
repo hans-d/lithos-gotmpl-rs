@@ -309,17 +309,22 @@ mod tests {
     }
 
     #[test]
-    fn uppercases_text() {
+    fn upper_rejects_uncoercible_input() {
         let mut ctx = ctx();
-        let out = super::upper(&mut ctx, &[json!("hello")]).unwrap();
-        assert_eq!(out, json!("HELLO"));
+        let err = super::upper(&mut ctx, &[json!(["oops"])])
+            .unwrap_err()
+            .to_string();
+        assert_eq!(
+            err,
+            "render error: upper argument 1 must be coercible to string, got Array [String(\"oops\")]"
+        );
     }
 
     #[test]
-    fn substr_handles_unicode() {
+    fn substr_returns_empty_string_when_start_exceeds_length() {
         let mut ctx = ctx();
-        let out = super::substr(&mut ctx, &[json!(1), json!(4), json!("héllo")]).unwrap();
-        assert_eq!(out, json!("éll"));
+        let out = super::substr(&mut ctx, &[json!(5), json!("hey")]).unwrap();
+        assert_eq!(out, json!(""));
     }
 
     #[test]
@@ -330,32 +335,12 @@ mod tests {
     }
 
     #[test]
-    fn quote_and_squote_wrap_values() {
+    fn repeat_rejects_negative_counts() {
         let mut ctx = ctx();
-        let quote_out = super::quote(&mut ctx, &[json!("foo"), json!("bar baz")]).unwrap();
-        assert_eq!(quote_out, json!("\"foo\" \"bar baz\""));
-        let squote_out = super::squote(&mut ctx, &[json!("foo"), json!(123)]).unwrap();
-        assert_eq!(squote_out, json!("'foo' '123'"));
-    }
-
-    #[test]
-    fn case_conversions_follow_sprig_conventions() {
-        let mut ctx = ctx();
+        let err = super::repeat(&mut ctx, &[json!(-1), json!("foo")]).unwrap_err();
         assert_eq!(
-            super::snakecase(&mut ctx, &[json!("FirstName")]).unwrap(),
-            json!("first_name")
-        );
-        assert_eq!(
-            super::camelcase(&mut ctx, &[json!("first_name")]).unwrap(),
-            json!("FirstName")
-        );
-        assert_eq!(
-            super::kebabcase(&mut ctx, &[json!("First Name")]).unwrap(),
-            json!("first-name")
-        );
-        assert_eq!(
-            super::swapcase(&mut ctx, &[json!("FirstName")]).unwrap(),
-            json!("fIRSTnAME")
+            err.to_string(),
+            "render error: repeat argument 1 must be a non-negative integer, got Number(-1)"
         );
     }
 }

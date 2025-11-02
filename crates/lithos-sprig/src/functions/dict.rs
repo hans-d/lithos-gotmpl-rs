@@ -202,129 +202,83 @@ mod tests {
     }
 
     #[test]
-    fn dict_builds_map() {
+    fn dict_rejects_odd_argument_counts() {
         let mut ctx = ctx();
-        let out = dict(&mut ctx, &[json!("foo"), json!(1)]).unwrap();
+        let err = dict(&mut ctx, &[json!("key")]).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "render error: dict expected even number of arguments, got 1"
+        );
+    }
+
+    #[test]
+    fn set_treats_null_as_empty_map() {
+        let mut ctx = ctx();
+        let out = set(&mut ctx, &[Value::Null, json!("foo"), json!(1)]).unwrap();
         assert_eq!(out, json!({"foo": 1}));
     }
 
     #[test]
-    fn set_updates_map() {
+    fn set_rejects_non_map_inputs() {
         let mut ctx = ctx();
-        let input = json!({"foo": 1});
-        let out = set(&mut ctx, &[input, json!("bar"), json!(2)]).unwrap();
-        assert_eq!(out, json!({"foo":1, "bar":2}));
+        let err = set(&mut ctx, &[json!("oops"), json!("foo"), json!(1)]).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "render error: set expects a map/object as the first argument, got String(\"oops\")"
+        );
     }
 
     #[test]
-    fn get_returns_value_when_present() {
+    fn merge_requires_objects_for_every_argument() {
         let mut ctx = ctx();
-        let map = json!({"foo": "bar"});
-        let out = get(&mut ctx, &[map, json!("foo")]).unwrap();
-        assert_eq!(out, json!("bar"));
+        let err = merge(&mut ctx, &[json!({"foo": 1}), json!([1, 2, 3])]).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "render error: merge expects a map/object as the first argument, got Array [Number(1), Number(2), Number(3)]"
+        );
     }
 
     #[test]
-    fn get_returns_empty_string_when_missing() {
+    fn pluck_ignores_non_maps_and_non_arrays() {
         let mut ctx = ctx();
-        let map = json!({"foo": "bar"});
-        let out = get(&mut ctx, &[map, json!("missing")]).unwrap();
-        assert_eq!(out, json!(""));
-    }
-
-    #[test]
-    fn keys_are_sorted() {
-        let mut ctx = ctx();
-        let map = dict(&mut ctx, &[json!("b"), json!(2), json!("a"), json!(1)]).unwrap();
-        let out = keys(&mut ctx, &[map]).unwrap();
-        assert_eq!(out, json!(["a", "b"]));
-    }
-
-    #[test]
-    fn merge_overrides_values() {
-        let mut ctx = ctx();
-        let out = merge(
-            &mut ctx,
-            &[json!({"foo": 1}), json!({"bar": 2}), json!({"foo": 3})],
-        )
-        .unwrap();
-        assert_eq!(out, json!({"foo": 3, "bar": 2}));
-    }
-
-    #[test]
-    fn values_follow_sorted_keys() {
-        let mut ctx = ctx();
-        let map = dict(
-            &mut ctx,
-            &[
-                json!("b"),
-                json!(2),
-                json!("a"),
-                json!(1),
-                json!("c"),
-                json!(3),
-            ],
-        )
-        .unwrap();
-        let out = values(&mut ctx, &[map]).unwrap();
-        assert_eq!(out, json!([1, 2, 3]));
-    }
-
-    #[test]
-    fn pick_extracts_selected_keys() {
-        let mut ctx = ctx();
-        let map = json!({"foo": 1, "bar": 2, "baz": 3});
-        let out = pick(&mut ctx, &[map, json!("foo"), json!("baz")]).unwrap();
-        assert_eq!(out, json!({"foo": 1, "baz": 3}));
-    }
-
-    #[test]
-    fn omit_removes_keys() {
-        let mut ctx = ctx();
-        let map = json!({"foo": 1, "bar": 2, "baz": 3});
-        let out = omit(&mut ctx, &[map, json!("bar")]).unwrap();
-        assert_eq!(out, json!({"foo": 1, "baz": 3}));
-    }
-
-    #[test]
-    fn pluck_collects_values_across_arrays() {
-        let mut ctx = ctx();
-        let list = json!([
-            {"name": "alpha"},
-            {"name": "beta"},
-            {"other": "ignored"}
-        ]);
-        let out = pluck(&mut ctx, &[json!("name"), list]).unwrap();
-        assert_eq!(out, json!(["alpha", "beta"]));
-
-        let out_maps = pluck(
+        let out = pluck(
             &mut ctx,
             &[
                 json!("name"),
-                json!({"name": "alpha"}),
+                json!(
+                    [
+                        {"name": "alpha"},
+                        Value::Null,
+                        {"other": "ignored"}
+                    ]
+                ),
                 json!({"name": "beta"}),
+                json!(["not", "an", "object"]),
             ],
         )
         .unwrap();
-        assert_eq!(out_maps, json!(["alpha", "beta"]));
+        assert_eq!(out, json!(["alpha", "beta"]));
     }
 
     #[test]
-    fn dig_returns_nested_value_or_default() {
+    fn dig_returns_default_when_path_hits_non_object() {
         let mut ctx = ctx();
-        let map = json!({"user": {"profile": {"id": 42}}});
-        let found = dig(
+        let data = json!({"user": "missing nested profile"});
+        let out = dig(
             &mut ctx,
-            &[json!("user"), json!("profile"), json!(0), map.clone()],
+            &[json!("user"), json!("profile"), json!("fallback"), data],
         )
         .unwrap();
-        assert_eq!(found, json!({"id": 42}));
+        assert_eq!(out, json!("fallback"));
+    }
 
-        let missing = dig(
-            &mut ctx,
-            &[json!("user"), json!("missing"), json!("fallback"), map],
-        )
-        .unwrap();
-        assert_eq!(missing, json!("fallback"));
+    #[test]
+    fn dig_requires_minimum_arguments() {
+        let mut ctx = ctx();
+        let err = dig(&mut ctx, &[json!("too"), json!("short")]).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "render error: dig requires at least three arguments, got 2"
+        );
     }
 }

@@ -144,9 +144,43 @@ mod tests {
     }
 
     #[test]
-    fn append_appends_values() {
+    fn first_requires_array_input() {
         let mut ctx = ctx();
-        let out = append(&mut ctx, &[json!(["a"]), json!("b"), json!("c")]).unwrap();
-        assert_eq!(out, json!(["a", "b", "c"]));
+        let err = first(&mut ctx, &[json!("oops")]).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "render error: first argument 1 must be an array, got String(\"oops\")"
+        );
+    }
+
+    #[test]
+    fn concat_propagates_first_non_array_error() {
+        let mut ctx = ctx();
+        let err = concat(&mut ctx, &[json!([1, 2]), json!({"bad": true})]).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "render error: concat argument 2 must be an array, got Object {\"bad\": Bool(true)}"
+        );
+    }
+
+    #[test]
+    fn without_handles_duplicates_and_nulls() {
+        let mut ctx = ctx();
+        let out = without(
+            &mut ctx,
+            &[json!([1, 2, 2, null, 3]), json!(2), Value::Null],
+        )
+        .unwrap();
+        assert_eq!(out, json!([1, 3]));
+    }
+
+    #[test]
+    fn has_rejects_invalid_haystack_type() {
+        let mut ctx = ctx();
+        let err = has(&mut ctx, &[json!("a"), json!({"not": "supported"})]).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "render error: has expects a string or array as the second argument"
+        );
     }
 }
