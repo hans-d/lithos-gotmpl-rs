@@ -145,8 +145,9 @@ The Sprig layer is organised the same way as the upstream documentation:
 - **String slices:** `splitList`, `split`, `splitn`, `join`, and `sortAlpha`.
 - **Lists:** `list`, `first`/`last`/`rest`/`initial`, `append`/`prepend`/`concat`,
   `reverse`, `compact`, `uniq`, `without`, and `has`.
-- **Maps:** `dict`, `merge`, `set`, `unset`, `hasKey`, `keys`, and `values`. Our
-  implementation sorts the outputs of `keys` and `values` to guarantee
+- **Maps:** `dict`, `merge`, `set`, `unset`, `hasKey`, `keys`, `values`,
+  `pick`, `omit`, `pluck`, and `dig`. Our implementation sorts the outputs of
+  `keys` and `values` to guarantee
   deterministic results, deviating from Go’s unspecified map iteration order.
 
 We intentionally omit Sprig helpers that rely on randomness, regular

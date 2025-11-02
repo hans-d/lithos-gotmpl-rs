@@ -48,6 +48,8 @@ fn go_sanity_matches_sprig_examples() {
         .parent()
         .expect("missing workspace root")
         .join("test-cases/lithos-sprig.json");
+    let go_cache = workspace_root.join("target/go-cache");
+    let _ = fs::create_dir_all(&go_cache);
 
     let output = Command::new("go")
         .arg("run")
@@ -55,6 +57,7 @@ fn go_sanity_matches_sprig_examples() {
         .arg("-cases")
         .arg(&cases_path)
         .current_dir(&runner_dir)
+        .env("GOCACHE", &go_cache)
         .output()
         .expect("failed to invoke go-sanity runner");
 
@@ -146,13 +149,14 @@ fn go_sanity_matches_sprig_examples() {
         }
     }
 
-    verify_directory_cases(&registry, runner_dir.as_path(), workspace_root);
+    verify_directory_cases(&registry, runner_dir.as_path(), workspace_root, &go_cache);
 }
 
 fn verify_directory_cases(
     registry: &lithos_gotmpl_engine::FunctionRegistry,
     runner_dir: &Path,
     workspace_root: &Path,
+    go_cache: &Path,
 ) {
     let dir_root = workspace_root.join("test-cases/sprig");
     if !dir_root.exists() {
@@ -214,6 +218,7 @@ fn verify_directory_cases(
             .arg("-cases")
             .arg(temp.path())
             .current_dir(runner_dir)
+            .env("GOCACHE", go_cache)
             .output()
             .expect("failed to invoke go-sanity runner for directory case");
 

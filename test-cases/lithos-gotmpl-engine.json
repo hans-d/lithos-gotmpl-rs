@@ -16,5 +16,17 @@
       ]
     },
     "expected": "0:A;2:C;"
+  },
+  {
+    "name": "comment-with-unmatched-quote",
+    "template": "{{/* comment with \\\" unmatched */}}",
+    "data": {},
+    "expected": ""
+  },
+  {
+    "name": "comment-with-unmatched-backtick",
+    "template": "{{/* comment with ` unmatched */}}",
+    "data": {},
+    "expected": ""
   }
 ]

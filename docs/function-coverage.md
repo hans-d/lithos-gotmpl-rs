@@ -94,6 +94,9 @@ Grouped following the upstream Sprig documentation.
 | `set` / `unset` | Add or remove keys from a map | ✅ |
 | `hasKey` | Check whether a key exists | ✅ |
 | `keys` / `values` | Return map keys or underlying values (sorted deterministically) | ✅ |
+| `pick` / `omit` | Include or exclude explicit keys from a map | ✅ |
+| `pluck` | Extract a field from each element in a collection | ✅ |
+| `dig` | Traverse nested maps with a default fallback | ✅ |
 
 ### Sprig Helpers Not Yet Ported
 
