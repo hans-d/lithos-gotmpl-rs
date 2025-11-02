@@ -50,11 +50,13 @@ assert_eq!(rendered, "Friend");
 
 ## Documentation
 
-- [`docs/README.md`](docs/README.md) – documentation index.
-- [`docs/reference/function-coverage.md`](docs/reference/function-coverage.md) – helper matrix (Go built-ins + Sprig).
-- [`docs/reference/template-syntax-coverage.md`](docs/reference/template-syntax-coverage.md) – grammar/introspection status.
-- [`docs/development/README.md`](docs/development/README.md) – contributor environment, commands, CI workflows.
-- [`docs/operations/releasing.md`](docs/operations/releasing.md) – release-plz flow and crate publishing checklist.
+Extended guides live under [`docs/`](docs/README.md). Highlights include:
+
+- [Testing strategy](docs/testing-guidelines.md) – behavioural fixtures, the Go oracle, and when to add Rust-only assertions.
+- [Function coverage](docs/reference/function-coverage.md) – helper matrix covering Go built-ins and Sprig additions.
+- [Template syntax coverage](docs/reference/template-syntax-coverage.md) – grammar/introspection status exercised by the suites.
+- [Contributor workflow](docs/development/README.md) – environment setup, CI commands, and contributor expectations.
+- [Releasing](docs/operations/releasing.md) – release-plz flow and crates.io publishing checklist.
 - `docs/legal/` – licence compliance notes and generated reports.
 
 ## Compatibility & Caveats

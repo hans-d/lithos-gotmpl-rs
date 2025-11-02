@@ -1,15 +1,19 @@
-# Documentation Guide
+# Documentation index
 
-- **Overview**
-  - [`../README.md`](../README.md) – project summary and quick start.
-- **Development**
-  - [`development/README.md`](development/README.md) – environment setup, Just recipes, CI workflow notes.
-- **Reference**
-  - [`reference/function-coverage.md`](reference/function-coverage.md) – helper coverage status.
-  - [`reference/template-syntax-coverage.md`](reference/template-syntax-coverage.md) – parser/runtime feature matrix.
-- **Operations**
-  - [`operations/releasing.md`](operations/releasing.md) – release-plz usage and crates.io publishing.
-- **Legal**
-  - [`legal/`](legal/) – generated licence inventories plus compliance scripts.
+Use these guides and references while working on the project:
 
-Everything else (testing fixtures, scripts, Go sanity harness) is documented inline within the repository.
+## Guides
+
+- [Testing strategy](testing-guidelines.md) – how to add or update behavioural fixtures, run the Go oracle, and decide when to write Rust-only tests.
+- [Contributor workflow](development/README.md) – environment setup, Just recipes, and CI workflow notes.
+- [Releasing](operations/releasing.md) – preparing crate releases and running the supporting automation.
+
+## References
+
+- [Function coverage](reference/function-coverage.md) – implemented helpers across the engine, core, and Sprig crates.
+- [Template syntax coverage](reference/template-syntax-coverage.md) – parser and evaluator scenarios captured by the current suites.
+
+## Legal
+
+- [License notices](legal/license-files.toml) – canonical list of bundled licenses.
+- [Notice snippets](legal/notice-snippets.txt) – reusable fragments for notices.
