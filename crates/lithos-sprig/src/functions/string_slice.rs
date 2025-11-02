@@ -36,6 +36,11 @@ pub fn split_map(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error>
     Ok(Value::Object(map))
 }
 
+/// Implements Sprig's `splitn` helper using Go's `strings.SplitN` semantics.
+///
+/// The argument order is `(sep, text, n)` to stay compatible with Sprig's
+/// templates and the Go oracle. The result is a JSON array so template authors
+/// can index into it by position (e.g., `splitn "," "a,b" 2 | index 1`).
 pub fn splitn(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
     expect_exact_args("splitn", args, 3)?;
     let sep = expect_string("splitn", &args[0], 1)?;
