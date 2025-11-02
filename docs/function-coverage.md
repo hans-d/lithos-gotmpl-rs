@@ -60,6 +60,9 @@ Grouped following the upstream Sprig documentation.
 | `indent` / `nindent` | Indent multi-line strings | ✅ |
 | `nospace` | Remove all whitespace | ✅ |
 | `repeat` | Repeats a string `count` times | ✅ |
+| `cat` | Concatenate arguments with spaces | ✅ |
+| `quote` / `squote` | Wrap values in double or single quotes | ✅ |
+| `snakecase` / `camelcase` / `kebabcase` / `swapcase` | Convert between naming conventions | ✅ |
 
 ### String Slice Helpers
 

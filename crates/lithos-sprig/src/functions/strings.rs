@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
+use heck::{ToKebabCase, ToSnakeCase, ToUpperCamelCase};
 use lithos_gotmpl_engine::{Error, EvalContext};
 use serde_json::{json, Value};
 
-use super::{clamp_char_range, expect_exact_args, expect_min_args, expect_string, expect_usize};
+use super::{
+    clamp_char_range, expect_exact_args, expect_min_args, expect_string, expect_usize,
+    value_to_string,
+};
 
 pub fn register(builder: &mut lithos_gotmpl_engine::FunctionRegistryBuilder) {
     builder
@@ -23,7 +27,14 @@ pub fn register(builder: &mut lithos_gotmpl_engine::FunctionRegistryBuilder) {
         .register("indent", indent)
         .register("nindent", nindent)
         .register("nospace", nospace)
-        .register("repeat", repeat);
+        .register("repeat", repeat)
+        .register("cat", cat)
+        .register("quote", quote)
+        .register("squote", squote)
+        .register("snakecase", snakecase)
+        .register("camelcase", camelcase)
+        .register("kebabcase", kebabcase)
+        .register("swapcase", swapcase);
 }
 
 pub fn upper(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
@@ -219,6 +230,75 @@ pub fn repeat(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
     Ok(json!(s.repeat(count)))
 }
 
+pub fn cat(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
+    let parts: Vec<String> = args
+        .iter()
+        .filter(|value| !value.is_null())
+        .map(|value| value_to_string(value))
+        .collect();
+    Ok(Value::String(parts.join(" ")))
+}
+
+pub fn quote(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
+    let mut parts = Vec::new();
+    for value in args {
+        if value.is_null() {
+            continue;
+        }
+        let raw = value_to_string(value);
+        let quoted = serde_json::to_string(&raw)
+            .unwrap_or_else(|_| format!("\"{}\"", raw.replace('"', "\\\"")));
+        parts.push(quoted);
+    }
+    Ok(Value::String(parts.join(" ")))
+}
+
+pub fn squote(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
+    let mut parts = Vec::new();
+    for value in args {
+        if value.is_null() {
+            continue;
+        }
+        let raw = value_to_string(value);
+        parts.push(format!("'{}'", raw));
+    }
+    Ok(Value::String(parts.join(" ")))
+}
+
+pub fn snakecase(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
+    expect_exact_args("snakecase", args, 1)?;
+    let input = expect_string("snakecase", &args[0], 1)?;
+    Ok(Value::String(input.to_snake_case()))
+}
+
+pub fn camelcase(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
+    expect_exact_args("camelcase", args, 1)?;
+    let input = expect_string("camelcase", &args[0], 1)?;
+    Ok(Value::String(input.to_upper_camel_case()))
+}
+
+pub fn kebabcase(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
+    expect_exact_args("kebabcase", args, 1)?;
+    let input = expect_string("kebabcase", &args[0], 1)?;
+    Ok(Value::String(input.to_kebab_case()))
+}
+
+pub fn swapcase(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
+    expect_exact_args("swapcase", args, 1)?;
+    let input = expect_string("swapcase", &args[0], 1)?;
+    let mut output = String::with_capacity(input.len());
+    for ch in input.chars() {
+        if ch.is_lowercase() {
+            output.extend(ch.to_uppercase());
+        } else if ch.is_uppercase() {
+            output.extend(ch.to_lowercase());
+        } else {
+            output.push(ch);
+        }
+    }
+    Ok(Value::String(output))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -240,5 +320,42 @@ mod tests {
         let mut ctx = ctx();
         let out = super::substr(&mut ctx, &[json!(1), json!(4), json!("héllo")]).unwrap();
         assert_eq!(out, json!("éll"));
+    }
+
+    #[test]
+    fn cat_skips_null_arguments() {
+        let mut ctx = ctx();
+        let out = super::cat(&mut ctx, &[Value::Null, json!("foo"), json!("bar")]).unwrap();
+        assert_eq!(out, json!("foo bar"));
+    }
+
+    #[test]
+    fn quote_and_squote_wrap_values() {
+        let mut ctx = ctx();
+        let quote_out = super::quote(&mut ctx, &[json!("foo"), json!("bar baz")]).unwrap();
+        assert_eq!(quote_out, json!("\"foo\" \"bar baz\""));
+        let squote_out = super::squote(&mut ctx, &[json!("foo"), json!(123)]).unwrap();
+        assert_eq!(squote_out, json!("'foo' '123'"));
+    }
+
+    #[test]
+    fn case_conversions_follow_sprig_conventions() {
+        let mut ctx = ctx();
+        assert_eq!(
+            super::snakecase(&mut ctx, &[json!("FirstName")]).unwrap(),
+            json!("first_name")
+        );
+        assert_eq!(
+            super::camelcase(&mut ctx, &[json!("first_name")]).unwrap(),
+            json!("FirstName")
+        );
+        assert_eq!(
+            super::kebabcase(&mut ctx, &[json!("First Name")]).unwrap(),
+            json!("first-name")
+        );
+        assert_eq!(
+            super::swapcase(&mut ctx, &[json!("FirstName")]).unwrap(),
+            json!("fIRSTnAME")
+        );
     }
 }

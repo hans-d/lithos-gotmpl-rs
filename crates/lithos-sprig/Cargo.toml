@@ -18,6 +18,7 @@ serde_json = "1"
 thiserror = "2"
 lithos-gotmpl-engine = { workspace = true }
 lithos-gotmpl-core = { workspace = true }
+heck = "0.5"
 
 [dev-dependencies]
 tempfile = "3"

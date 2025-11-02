@@ -138,8 +138,10 @@ The Sprig layer is organised the same way as the upstream documentation:
 
 - **Flow control:** `default`, `coalesce`, `ternary`, `empty`, `fail`, and JSON
   helpers (`fromJson`, `toJson`, plus the `must*` variants).
-- **Strings:** case conversion, trim/affix helpers, `contains`, `replace`,
-  `substr`, `trunc`, `wrap`, `indent`/`nindent`, `nospace`, and `repeat`.
+- **Strings:** case conversion helpers (`snakecase`, `camelcase`, `kebabcase`,
+  `swapcase`), concatenation and quoting (`cat`, `quote`, `squote`),
+  trim/affix helpers, `contains`, `replace`, `substr`, `trunc`, `wrap`,
+  `indent`/`nindent`, `nospace`, and `repeat`.
 - **String slices:** `splitList`, `split`, `splitn`, `join`, and `sortAlpha`.
 - **Lists:** `list`, `first`/`last`/`rest`/`initial`, `append`/`prepend`/`concat`,
   `reverse`, `compact`, `uniq`, `without`, and `has`.
