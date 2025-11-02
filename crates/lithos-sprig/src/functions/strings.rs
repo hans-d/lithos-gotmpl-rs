@@ -8,33 +8,136 @@ use super::{
     value_to_string,
 };
 
+type StringFunction = fn(&mut EvalContext, &[Value]) -> Result<Value, Error>;
+
+const CASE_CONVERSION_FUNCS: &[(&str, StringFunction)] = &[
+    ("upper", upper),
+    ("lower", lower),
+    ("title", title),
+    ("snakecase", snakecase),
+    ("camelcase", camelcase),
+    ("kebabcase", kebabcase),
+    ("swapcase", swapcase),
+];
+
+const TRIMMING_FUNCS: &[(&str, StringFunction)] = &[
+    ("trim", trim),
+    ("trimAll", trim_all),
+    ("trimPrefix", trim_prefix),
+    ("trimSuffix", trim_suffix),
+    ("hasPrefix", has_prefix),
+    ("hasSuffix", has_suffix),
+];
+
+const SEARCH_FUNCS: &[(&str, StringFunction)] = &[
+    ("contains", contains),
+    ("replace", replace),
+    ("substr", substr),
+    ("trunc", trunc),
+];
+
+const FORMATTING_FUNCS: &[(&str, StringFunction)] = &[
+    ("wrap", wrap),
+    ("indent", indent),
+    ("nindent", nindent),
+    ("nospace", nospace),
+    ("repeat", repeat),
+    ("cat", cat),
+    ("quote", quote),
+    ("squote", squote),
+];
+
 pub fn register(builder: &mut lithos_gotmpl_engine::FunctionRegistryBuilder) {
-    builder
-        .register("upper", upper)
-        .register("lower", lower)
-        .register("title", title)
-        .register("trim", trim)
-        .register("trimAll", trim_all)
-        .register("trimPrefix", trim_prefix)
-        .register("trimSuffix", trim_suffix)
-        .register("hasPrefix", has_prefix)
-        .register("hasSuffix", has_suffix)
-        .register("contains", contains)
-        .register("replace", replace)
-        .register("substr", substr)
-        .register("trunc", trunc)
-        .register("wrap", wrap)
-        .register("indent", indent)
-        .register("nindent", nindent)
-        .register("nospace", nospace)
-        .register("repeat", repeat)
-        .register("cat", cat)
-        .register("quote", quote)
-        .register("squote", squote)
-        .register("snakecase", snakecase)
-        .register("camelcase", camelcase)
-        .register("kebabcase", kebabcase)
-        .register("swapcase", swapcase);
+    for &(name, func) in CASE_CONVERSION_FUNCS
+        .iter()
+        .chain(TRIMMING_FUNCS.iter())
+        .chain(SEARCH_FUNCS.iter())
+        .chain(FORMATTING_FUNCS.iter())
+    {
+        builder.register(name, func);
+    }
+}
+
+fn title_case(input: &str) -> String {
+    let mut result = String::with_capacity(input.len());
+    for (idx, word) in input.split_whitespace().enumerate() {
+        if idx > 0 {
+            result.push(' ');
+        }
+        let mut chars = word.chars();
+        if let Some(first) = chars.next() {
+            result.extend(first.to_uppercase());
+            result.push_str(&chars.collect::<String>().to_lowercase());
+        }
+    }
+    result
+}
+
+fn strip_prefix(input: &str, prefix: &str) -> String {
+    if input.starts_with(prefix) {
+        input[prefix.len()..].to_string()
+    } else {
+        input.to_string()
+    }
+}
+
+fn strip_suffix(input: &str, suffix: &str) -> String {
+    if input.ends_with(suffix) {
+        let end = input.len() - suffix.len();
+        input[..end].to_string()
+    } else {
+        input.to_string()
+    }
+}
+
+fn wrap_text(width: usize, text: &str) -> String {
+    if width == 0 {
+        return text.to_string();
+    }
+    let mut lines = Vec::new();
+    let mut current = String::new();
+    for word in text.split_whitespace() {
+        let word_len = word.chars().count();
+        let current_len = current.chars().count();
+        if current.is_empty() {
+            current.push_str(word);
+        } else if current_len + 1 + word_len <= width {
+            current.push(' ');
+            current.push_str(word);
+        } else {
+            lines.push(current);
+            current = word.to_string();
+        }
+    }
+    if !current.is_empty() {
+        lines.push(current);
+    }
+    lines.join("\n")
+}
+
+fn indent_text(spaces: usize, input: &str) -> String {
+    let pad = " ".repeat(spaces);
+    input
+        .lines()
+        .map(|line| format!("{pad}{line}"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn remove_whitespace(input: &str) -> String {
+    input.chars().filter(|c| !c.is_whitespace()).collect()
+}
+
+fn truncate_chars(text: &str, length: usize) -> String {
+    text.chars().take(length).collect()
+}
+
+fn render_non_null(args: &[Value], mut render: impl FnMut(&str) -> String) -> String {
+    args.iter()
+        .filter(|value| !value.is_null())
+        .map(|value| render(&value_to_string(value)))
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 pub fn upper(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
@@ -52,18 +155,7 @@ pub fn lower(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
 pub fn title(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
     expect_min_args("title", args, 1)?;
     let input = expect_string("title", &args[0], 1)?;
-    let mut result = String::with_capacity(input.len());
-    for (idx, word) in input.split_whitespace().enumerate() {
-        if idx > 0 {
-            result.push(' ');
-        }
-        let mut chars = word.chars();
-        if let Some(first) = chars.next() {
-            result.extend(first.to_uppercase());
-            result.push_str(&chars.collect::<String>().to_lowercase());
-        }
-    }
-    Ok(json!(result))
+    Ok(json!(title_case(&input)))
 }
 
 pub fn trim(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
@@ -83,25 +175,14 @@ pub fn trim_prefix(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Erro
     expect_exact_args("trimPrefix", args, 2)?;
     let prefix = expect_string("trimPrefix", &args[0], 1)?;
     let input = expect_string("trimPrefix", &args[1], 2)?;
-    let result = if input.starts_with(&prefix) {
-        input[prefix.len()..].to_string()
-    } else {
-        input
-    };
-    Ok(json!(result))
+    Ok(json!(strip_prefix(&input, &prefix)))
 }
 
 pub fn trim_suffix(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
     expect_exact_args("trimSuffix", args, 2)?;
     let suffix = expect_string("trimSuffix", &args[0], 1)?;
     let input = expect_string("trimSuffix", &args[1], 2)?;
-    let result = if input.ends_with(&suffix) {
-        let end = input.len() - suffix.len();
-        input[..end].to_string()
-    } else {
-        input
-    };
-    Ok(json!(result))
+    Ok(json!(strip_suffix(&input, &suffix)))
 }
 
 pub fn has_prefix(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
@@ -157,54 +238,21 @@ pub fn trunc(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
     expect_exact_args("trunc", args, 2)?;
     let length = expect_usize("trunc", &args[0], 1)?;
     let text = expect_string("trunc", &args[1], 2)?;
-    let chars: Vec<char> = text.chars().collect();
-    let end = length.min(chars.len());
-    let mut out = String::with_capacity(text.len());
-    for ch in &chars[..end] {
-        out.push(*ch);
-    }
-    Ok(Value::String(out))
+    Ok(Value::String(truncate_chars(&text, length)))
 }
 
 pub fn wrap(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
     expect_exact_args("wrap", args, 2)?;
     let width = expect_usize("wrap", &args[0], 1)?;
     let text = expect_string("wrap", &args[1], 2)?;
-    if width == 0 {
-        return Ok(Value::String(text));
-    }
-    let mut lines = Vec::new();
-    let mut current = String::new();
-    for word in text.split_whitespace() {
-        let word_len = word.chars().count();
-        let current_len = current.chars().count();
-        if current.is_empty() {
-            current.push_str(word);
-        } else if current_len + 1 + word_len <= width {
-            current.push(' ');
-            current.push_str(word);
-        } else {
-            lines.push(current);
-            current = word.to_string();
-        }
-    }
-    if !current.is_empty() {
-        lines.push(current);
-    }
-    Ok(Value::String(lines.join("\n")))
+    Ok(Value::String(wrap_text(width, &text)))
 }
 
 pub fn indent(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
     expect_exact_args("indent", args, 2)?;
     let spaces = expect_usize("indent", &args[0], 1)?;
     let input = expect_string("indent", &args[1], 2)?;
-    let pad = " ".repeat(spaces);
-    let result = input
-        .lines()
-        .map(|line| format!("{pad}{line}"))
-        .collect::<Vec<_>>()
-        .join("\n");
-    Ok(Value::String(result))
+    Ok(Value::String(indent_text(spaces, &input)))
 }
 
 pub fn nindent(ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
@@ -218,9 +266,7 @@ pub fn nindent(ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
 pub fn nospace(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
     expect_exact_args("nospace", args, 1)?;
     let input = expect_string("nospace", &args[0], 1)?;
-    Ok(Value::String(
-        input.chars().filter(|c| !c.is_whitespace()).collect(),
-    ))
+    Ok(Value::String(remove_whitespace(&input)))
 }
 
 pub fn repeat(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
@@ -231,38 +277,19 @@ pub fn repeat(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
 }
 
 pub fn cat(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
-    let parts: Vec<String> = args
-        .iter()
-        .filter(|value| !value.is_null())
-        .map(|value| value_to_string(value))
-        .collect();
-    Ok(Value::String(parts.join(" ")))
+    Ok(Value::String(render_non_null(args, |s| s.to_string())))
 }
 
 pub fn quote(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
-    let mut parts = Vec::new();
-    for value in args {
-        if value.is_null() {
-            continue;
-        }
-        let raw = value_to_string(value);
-        let quoted = serde_json::to_string(&raw)
-            .unwrap_or_else(|_| format!("\"{}\"", raw.replace('"', "\\\"")));
-        parts.push(quoted);
-    }
-    Ok(Value::String(parts.join(" ")))
+    Ok(Value::String(render_non_null(args, |raw| {
+        serde_json::to_string(raw).unwrap_or_else(|_| format!("\"{}\"", raw.replace('"', "\\\"")))
+    })))
 }
 
 pub fn squote(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
-    let mut parts = Vec::new();
-    for value in args {
-        if value.is_null() {
-            continue;
-        }
-        let raw = value_to_string(value);
-        parts.push(format!("'{}'", raw));
-    }
-    Ok(Value::String(parts.join(" ")))
+    Ok(Value::String(render_non_null(args, |raw| {
+        format!("'{}'", raw)
+    })))
 }
 
 pub fn snakecase(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
@@ -342,5 +369,29 @@ mod tests {
             err.to_string(),
             "render error: repeat argument 1 must be a non-negative integer, got Number(-1)"
         );
+    }
+
+    #[test]
+    fn strip_prefix_and_suffix_are_safe() {
+        assert_eq!(super::strip_prefix("foobar", "foo"), "bar");
+        assert_eq!(super::strip_prefix("foobar", "baz"), "foobar");
+        assert_eq!(super::strip_suffix("foobar", "bar"), "foo");
+        assert_eq!(super::strip_suffix("foobar", "qux"), "foobar");
+    }
+
+    #[test]
+    fn wrap_text_respects_word_boundaries() {
+        let wrapped = super::wrap_text(4, "foo bar baz");
+        assert_eq!(wrapped, "foo\nbar\nbaz");
+        let zero_width = super::wrap_text(0, "no change");
+        assert_eq!(zero_width, "no change");
+    }
+
+    #[test]
+    fn render_non_null_skips_missing_values() {
+        let rendered = super::render_non_null(&[Value::Null, json!("foo"), json!("bar")], |raw| {
+            format!("<{raw}>")
+        });
+        assert_eq!(rendered, "<foo> <bar>");
     }
 }
