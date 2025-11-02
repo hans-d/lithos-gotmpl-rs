@@ -62,7 +62,7 @@ Before submitting a pull request:
 - Public APIs should carry concise rustdoc comments.
 - If you add a new helper or template feature, mirror it in `test-cases/` and extend the Go oracle
   fixtures when possible.
-- Keep `docs/function-coverage.md` and `docs/template-syntax-coverage.md` in sync with new
+- Keep `docs/reference/function-coverage.md` and `docs/reference/template-syntax-coverage.md` in sync with new
   capabilities.
 
 ## Fuzzing & Mutation Testing

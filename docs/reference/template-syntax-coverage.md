@@ -57,7 +57,6 @@ coverage; ❌ not implemented yet.
 ## Documentation & Future Work
 
 - Once TODOs above are covered, mark the corresponding entries as ✅ along with the test name.
-- Additional Go references worth porting are catalogued in `docs/go-parser-test-candidates.md`.
 - We can leverage `cargo doc` (with module-level `//!` docs) to surface these tables automatically on
   docs.rs or internal pages. Consider embedding this table inside a module doc so `cargo doc -p
   lithos-gotmpl-engine` renders the coverage report.

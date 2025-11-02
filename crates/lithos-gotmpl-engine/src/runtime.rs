@@ -43,6 +43,13 @@ impl FunctionRegistry {
     pub fn is_empty(&self) -> bool {
         self.map.is_empty()
     }
+
+    /// Returns a sorted list of the registered function names.
+    pub fn function_names(&self) -> Vec<String> {
+        let mut names: Vec<String> = self.map.keys().cloned().collect();
+        names.sort();
+        names
+    }
 }
 
 /// Helper for constructing registries before freezing them into an immutable map.
