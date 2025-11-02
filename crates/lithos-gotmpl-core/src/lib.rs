@@ -614,7 +614,7 @@ mod tests {
 
         let mut float_chars = "f".chars();
         let float_spec = ParsedSpecifier::parse(&mut float_chars).unwrap();
-        assert_eq!(float_spec.format(Some(&json!(3.1400))).unwrap(), "3.14");
+        assert_eq!(float_spec.format(Some(&json!(2.5000))).unwrap(), "2.5");
 
         let mut fallback_chars = "q".chars();
         let fallback_spec = ParsedSpecifier::parse(&mut fallback_chars).unwrap();
