@@ -180,17 +180,22 @@ fn collect_numeric_inputs(
         ));
     }
 
-    Ok(args
-        .iter()
-        .enumerate()
-        .map(|(idx, value)| (value.clone(), idx + 1))
-        .collect())
+    let mut collected = Vec::new();
+    for (idx, value) in args.iter().enumerate() {
+        let position = idx + 1;
+        if let Value::Array(items) = value {
+            for item in items {
+                collected.push((item.clone(), position));
+            }
+        } else {
+            collected.push((value.clone(), position));
+        }
+    }
+
+    Ok(collected)
 }
 
 fn to_number(name: &'static str, position: usize, value: &Value) -> Result<f64, Error> {
-    if value.is_array() {
-        return Ok(0.0);
-    }
     coerce_number(value)
         .map_err(|_| Error::render(format!("{name} argument {position} must be numeric"), None))
 }
@@ -266,7 +271,7 @@ mod tests {
     fn min_over_list_argument() {
         let mut ctx = ctx();
         let out = super::min(&mut ctx, &[json!([4, 2, 9])]).unwrap();
-        assert_eq!(out, json!(0));
+        assert_eq!(out, json!(2));
     }
 
     #[test]
@@ -274,6 +279,13 @@ mod tests {
         let mut ctx = ctx();
         let out = super::min(&mut ctx, &[json!(4), json!(2), json!(9)]).unwrap();
         assert_eq!(out, json!(2));
+    }
+
+    #[test]
+    fn max_over_list_argument() {
+        let mut ctx = ctx();
+        let out = super::max(&mut ctx, &[json!([4, 2, 9])]).unwrap();
+        assert_eq!(out, json!(9));
     }
 
     #[test]
