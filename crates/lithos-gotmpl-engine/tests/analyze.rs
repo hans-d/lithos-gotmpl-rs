@@ -98,3 +98,15 @@ fn analysis_reports_else_if_functions() {
     assert_eq!(helper_calls.len(), 1);
     assert!(report.unknown_functions.is_empty());
 }
+
+#[test]
+fn parser_rejects_else_without_if() {
+    let err = Template::parse_str("else-with", "{{ if true }}A{{ else with . }}B{{ end }}")
+        .expect_err("parse should fail");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("invalid else-if: expected 'if' after 'else'"),
+        "unexpected parse error: {}",
+        msg
+    );
+}

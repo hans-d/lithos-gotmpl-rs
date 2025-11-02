@@ -290,11 +290,21 @@ fn classify_action(tokens: &[Token]) -> Result<ActionKind, Error> {
             }
             Ok(ActionKind::With)
         }
-        TokenKind::Keyword(Keyword::Else) => Ok(if tokens.len() == 1 {
-            ActionKind::Else
-        } else {
-            ActionKind::ElseIf
-        }),
+        TokenKind::Keyword(Keyword::Else) => {
+            if tokens.len() == 1 {
+                return Ok(ActionKind::Else);
+            }
+
+            let second = &tokens[1];
+            if matches!(second.kind, TokenKind::Keyword(Keyword::If)) {
+                Ok(ActionKind::ElseIf)
+            } else {
+                Err(Error::parse(
+                    "invalid else-if: expected 'if' after 'else'",
+                    Some(second.span),
+                ))
+            }
+        }
         TokenKind::Keyword(Keyword::End) => {
             if tokens.len() > 1 {
                 return Err(Error::parse(
