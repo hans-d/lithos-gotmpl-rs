@@ -219,7 +219,6 @@ fn verify_directory_cases(
             .arg(temp.path())
             .current_dir(runner_dir)
             .env("GOCACHE", go_cache)
-            .env("GOCACHE", &go_cache)
             .output()
             .expect("failed to invoke go-sanity runner for directory case");
 
