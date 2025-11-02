@@ -219,7 +219,10 @@ fn trim_action_delimiters<'a>(
 
     let span = Span::new(open, close + 2);
     let raw = &source[body_start..body_end];
-    let body = raw.trim();
+    let trimmed_start = raw.trim_start();
+    let prefix_len = raw.len() - trimmed_start.len();
+    let body = trimmed_start.trim_end();
+    body_start += prefix_len;
 
     ActionWindow {
         span,
@@ -922,7 +925,7 @@ mod tests {
         assert!(window.trim_left);
         assert!(window.trim_right);
         assert_eq!(window.body, "foo");
-        assert_eq!(window.body_start, 3);
+        assert_eq!(window.body_start, 4);
         assert_eq!(window.span, Span::new(0, source.len()));
     }
 
