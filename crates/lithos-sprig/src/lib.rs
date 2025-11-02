@@ -9,6 +9,16 @@ use lithos_gotmpl_core::{
 
 mod functions;
 
+/// Installs both the Go text/template compatibility helpers and the Sprig
+/// extensions into the provided registry builder. By sequencing
+/// [`install_text_template_functions`] before [`install_sprig_functions`], this
+/// convenience mirrors how Go projects expect Sprig to augment the core helper
+/// set without overwriting the defaults.
+pub fn install_all(builder: &mut FunctionRegistryBuilder) {
+    install_text_template_functions(builder);
+    install_sprig_functions(builder);
+}
+
 /// Registers the sprig helpers into an existing function registry builder.
 pub fn install_sprig_functions(builder: &mut FunctionRegistryBuilder) {
     functions::install_all(builder);

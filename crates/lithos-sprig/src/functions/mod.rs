@@ -10,6 +10,11 @@ mod lists;
 mod string_slice;
 mod strings;
 
+/// Installs every Sprig helper group into the provided registry builder so the
+/// caller gets the full surface area of Lithos' Sprig support in one pass.
+/// Keeping this wiring centralized avoids drift between helper families and
+/// mirrors the expectations of templates that rely on Go's `sprig`
+/// distribution.
 pub fn install_all(builder: &mut FunctionRegistryBuilder) {
     flow::register(builder);
     strings::register(builder);
