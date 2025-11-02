@@ -9,10 +9,7 @@ on:
     branches: [main, master]
   workflow_dispatch: {}
 
-permissions:
-  contents: read
-  security-events: write
-  id-token: write
+permissions: read-all
 
 concurrency:
   group: scorecard-${{ github.ref }}
@@ -23,6 +20,10 @@ jobs:
     name: Scorecard Analysis
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+      id-token: write
     steps:
       - name: Harden runner
         # yamllint disable-line rule:comments
