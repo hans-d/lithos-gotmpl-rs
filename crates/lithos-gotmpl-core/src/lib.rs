@@ -8,14 +8,18 @@ pub use lithos_gotmpl_engine::{
 use serde_json::Number;
 use serde_json::Value;
 
-/// Returns a registry populated with the standard Go text/template helper functions.
+/// Builds a registry that mirrors the helper set Go's `text/template` exposes by
+/// default, keeping Lithos-compatible templates aligned with the reference
+/// implementation.
 pub fn text_template_functions() -> FunctionRegistry {
     let mut builder = FunctionRegistryBuilder::new();
     install_text_template_functions(&mut builder);
     builder.build()
 }
 
-/// Installs the standard Go text/template helper functions into an existing registry builder.
+/// Adds the helpers shipped by Go's `text/template` to the provided registry
+/// builder so templates written against Go's defaults continue to behave as
+/// expected when rendered through Lithos.
 pub fn install_text_template_functions(builder: &mut FunctionRegistryBuilder) {
     builder
         .register("and", builtin_and)
