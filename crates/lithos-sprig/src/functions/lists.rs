@@ -60,11 +60,10 @@ pub fn append(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
 }
 
 pub fn prepend(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
-    expect_min_args("prepend", args, 2)?;
-    let list = expect_array("prepend", &args[0], 1)?;
-    let mut prefix: Vec<Value> = args[1..].to_vec();
-    prefix.extend(list);
-    Ok(Value::Array(prefix))
+    expect_exact_args("prepend", args, 2)?;
+    let mut list = expect_array("prepend", &args[0], 1)?;
+    list.insert(0, args[1].clone());
+    Ok(Value::Array(list))
 }
 
 pub fn concat(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {

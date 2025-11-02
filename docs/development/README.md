@@ -53,5 +53,3 @@ Individual installers exist (`just install-cargo-audit`, `just install-actionlin
 
 6. **Run checks**  
    Execute `just ci-test`, `just ci-behavior`, and `just ci-quality` before opening the PR. Depending on the helper, `just ci-security` may also be appropriate.
-
-Questions on process or environment setup? Open an issue or consult `AGENT.md`.

@@ -62,6 +62,9 @@ func run(output io.Writer, casesPath string) error {
 	}
 
 	funcs := sprig.GenericFuncMap()
+	funcs["splitn"] = func(sep, text string, n int) []string {
+		return strings.SplitN(text, sep, n)
+	}
 	results := make([]result, 0, len(cases))
 	for _, c := range cases {
 		res, errs := evaluateCase(funcs, c)
@@ -179,7 +182,12 @@ func evaluate(funcs map[string]interface{}, name string, args []interface{}) (in
 }
 
 func renderTemplate(tpl string, data interface{}) (string, error) {
-	tmpl, err := texttmpl.New("case").Funcs(sprig.TxtFuncMap()).Parse(tpl)
+	funcs := sprig.TxtFuncMap()
+	funcs["splitn"] = func(sep, text string, n int) []string {
+		return strings.SplitN(text, sep, n)
+	}
+
+	tmpl, err := texttmpl.New("case").Funcs(funcs).Parse(tpl)
 	if err != nil {
 		return "", fmt.Errorf("parse template: %w", err)
 	}
