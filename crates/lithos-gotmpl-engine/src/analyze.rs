@@ -5,12 +5,16 @@ use crate::ast::{ActionNode, Ast, Command, Expression, IfNode, Node, RangeNode, 
 use crate::lexer::{Token, TokenKind};
 use crate::runtime::FunctionRegistry;
 
+/// Walks the parsed template AST and records helper, variable, and control flow
+/// usage so tooling can reason about dependencies without reinterpreting the
+/// template.
 pub fn analyze_template(ast: &Ast, registry: Option<&FunctionRegistry>) -> TemplateAnalysis {
     let mut analyzer = Analyzer::new(registry);
     analyzer.walk_block(&ast.root);
     analyzer.finish()
 }
 
+/// Summary of static insights gathered from a template analysis pass.
 #[derive(Debug, Clone)]
 pub struct TemplateAnalysis {
     pub version: &'static str,
@@ -23,12 +27,16 @@ pub struct TemplateAnalysis {
     pub issues: Vec<AnalysisIssue>,
 }
 
+/// Signals how confident the analyzer is in its findings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Precision {
+    /// The analyzer tracked every construct exactly.
     Precise,
+    /// Some constructs required fallbacks, so consumers should treat results conservatively.
     Conservative,
 }
 
+/// Describes an observed template variable access.
 #[derive(Debug, Clone)]
 pub struct VariableAccess {
     pub path: String,
@@ -37,18 +45,21 @@ pub struct VariableAccess {
     pub certainty: Certainty,
 }
 
+/// Distinguishes whether a variable came from dot or dollar notation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VariableKind {
     Dot,
     Dollar,
 }
 
+/// Indicates whether the analyzer is sure the usage will execute.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Certainty {
     Certain,
     Uncertain,
 }
 
+/// Represents a helper invocation encountered in the template.
 #[derive(Debug, Clone)]
 pub struct FunctionCall {
     pub name: String,
@@ -56,12 +67,16 @@ pub struct FunctionCall {
     pub source: FunctionSource,
 }
 
+/// Identifies where a helper came from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FunctionSource {
+    /// The helper resolved to a registry entry.
     Registered,
+    /// The helper could not be matched to known functions.
     Unknown,
 }
 
+/// Notes a call to another template, including indirect invocations via variables.
 #[derive(Debug, Clone)]
 pub struct TemplateCall {
     pub span: Span,
@@ -69,12 +84,14 @@ pub struct TemplateCall {
     pub indirect: bool,
 }
 
+/// Records uses of control-flow constructs such as `if` and `range`.
 #[derive(Debug, Clone)]
 pub struct ControlUsage {
     pub kind: ControlKind,
     pub span: Span,
 }
 
+/// Enumerates the control-flow primitives surfaced in analysis.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ControlKind {
     If,
@@ -86,6 +103,7 @@ pub enum ControlKind {
     End,
 }
 
+/// Captures non-fatal issues the analyzer noticed, such as syntax ambiguities.
 #[derive(Debug, Clone)]
 pub struct AnalysisIssue {
     pub message: String,
