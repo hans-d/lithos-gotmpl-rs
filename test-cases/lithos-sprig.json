@@ -50,6 +50,18 @@
     "expected": "hello sprig"
   },
   {
+    "name": "title-basic",
+    "function": "title",
+    "args": [
+      "hello sprig helpers"
+    ],
+    "template": "{{ title .text }}",
+    "data": {
+      "text": "hello sprig helpers"
+    },
+    "expected": "Hello Sprig Helpers"
+  },
+  {
     "name": "trim-whitespace",
     "function": "trim",
     "args": [
@@ -60,6 +72,16 @@
       "text": "  padded  \n"
     },
     "expected": "padded"
+  },
+  {
+    "name": "trimall-cutset",
+    "function": "trimAll",
+    "args": [
+      "-:",
+      "-:value:-"
+    ],
+    "template": "{{ trimAll \"-:\" \"-:value:-\" }}",
+    "expected": "value"
   },
   {
     "name": "contains-hit",
@@ -130,6 +152,11 @@
     "expected": "true"
   },
   {
+    "name": "fail-conditional",
+    "template": "{{ if false }}{{ fail \"boom\" }}{{ end }}",
+    "expected": ""
+  },
+  {
     "name": "trimprefix-basic",
     "function": "trimPrefix",
     "args": [
@@ -140,6 +167,16 @@
     "expected": "pher"
   },
   {
+    "name": "hasprefix-basic",
+    "function": "hasPrefix",
+    "args": [
+      "go",
+      "gopher"
+    ],
+    "template": "{{ hasPrefix \"go\" \"gopher\" }}",
+    "expected": "true"
+  },
+  {
     "name": "hassuffix-basic",
     "function": "hasSuffix",
     "args": [
@@ -148,6 +185,16 @@
     ],
     "template": "{{ hasSuffix \".rs\" \"main.rs\" }}",
     "expected": "true"
+  },
+  {
+    "name": "trimsuffix-basic",
+    "function": "trimSuffix",
+    "args": [
+      ".rs",
+      "main.rs"
+    ],
+    "template": "{{ trimSuffix \".rs\" \"main.rs\" }}",
+    "expected": "main"
   },
   {
     "name": "replace-basic",
@@ -169,6 +216,27 @@
     ],
     "template": "{{ join \":\" (splitList \",\" \"a,b,c\") }}",
     "expected": "a:b:c"
+  },
+  {
+    "name": "split-map",
+    "function": "split",
+    "args": [
+      ",",
+      "a,b,c"
+    ],
+    "template": "{{ toJson (split \",\" \"a,b,c\") }}",
+    "expected": "{\"_0\":\"a\",\"_1\":\"b\",\"_2\":\"c\"}"
+  },
+  {
+    "name": "splitn-limit",
+    "function": "splitn",
+    "args": [
+      ",",
+      2,
+      "a,b,c"
+    ],
+    "template": "{{ toJson (splitn \",\" 2 \"a,b,c\") }}",
+    "expected": "{\"_0\":\"a\",\"_1\":\"b,c\"}"
   },
   {
     "name": "join-basic",
@@ -196,6 +264,58 @@
     "expected": "abc"
   },
   {
+    "name": "first-basic",
+    "function": "first",
+    "args": [
+      [
+        1,
+        2,
+        3
+      ]
+    ],
+    "template": "{{ first (list 1 2 3) }}",
+    "expected": "1"
+  },
+  {
+    "name": "last-basic",
+    "function": "last",
+    "args": [
+      [
+        1,
+        2,
+        3
+      ]
+    ],
+    "template": "{{ last (list 1 2 3) }}",
+    "expected": "3"
+  },
+  {
+    "name": "rest-basic",
+    "function": "rest",
+    "args": [
+      [
+        1,
+        2,
+        3
+      ]
+    ],
+    "template": "{{ toJson (rest (list 1 2 3)) }}",
+    "expected": "[2,3]"
+  },
+  {
+    "name": "initial-basic",
+    "function": "initial",
+    "args": [
+      [
+        1,
+        2,
+        3
+      ]
+    ],
+    "template": "{{ toJson (initial (list 1 2 3)) }}",
+    "expected": "[1,2]"
+  },
+  {
     "name": "append-basic",
     "function": "append",
     "args": [
@@ -207,6 +327,48 @@
     ],
     "template": "{{ join \",\" (append (list \"a\" \"b\") \"c\") }}",
     "expected": "a,b,c"
+  },
+  {
+    "name": "prepend-basic",
+    "function": "prepend",
+    "args": [
+      [
+        2,
+        3
+      ],
+      1
+    ],
+    "template": "{{ toJson (prepend (list 2 3) 1) }}",
+    "expected": "[1,2,3]"
+  },
+  {
+    "name": "concat-basic",
+    "function": "concat",
+    "args": [
+      [
+        1,
+        2
+      ],
+      [
+        3,
+        4
+      ]
+    ],
+    "template": "{{ toJson (concat (list 1 2) (list 3 4)) }}",
+    "expected": "[1,2,3,4]"
+  },
+  {
+    "name": "reverse-basic",
+    "function": "reverse",
+    "args": [
+      [
+        1,
+        2,
+        3
+      ]
+    ],
+    "template": "{{ toJson (reverse (list 1 2 3)) }}",
+    "expected": "[3,2,1]"
   },
   {
     "name": "uniq-basic",
@@ -248,6 +410,18 @@
     "expected": "{\"foo\":\"bar\"}"
   },
   {
+    "name": "mustfromjson-roundtrip",
+    "function": "mustFromJson",
+    "args": [
+      "{\"foo\":\"bar\"}"
+    ],
+    "template": "{{ mustFromJson .json | toJson }}",
+    "data": {
+      "json": "{\"foo\":\"bar\"}"
+    },
+    "expected": "{\"foo\":\"bar\"}"
+  },
+  {
     "name": "tojson-object",
     "function": "toJson",
     "args": [
@@ -262,6 +436,82 @@
       }
     },
     "expected": "{\"foo\":\"bar\"}"
+  },
+  {
+    "name": "toprettyjson-object",
+    "function": "toPrettyJson",
+    "args": [
+      {
+        "foo": "bar"
+      }
+    ],
+    "template": "{{ toPrettyJson .value }}",
+    "data": {
+      "value": {
+        "foo": "bar"
+      }
+    },
+    "expected": "{\n  \"foo\": \"bar\"\n}"
+  },
+  {
+    "name": "musttoprettyjson-object",
+    "function": "mustToPrettyJson",
+    "args": [
+      {
+        "foo": "bar"
+      }
+    ],
+    "template": "{{ mustToPrettyJson .value }}",
+    "data": {
+      "value": {
+        "foo": "bar"
+      }
+    },
+    "expected": "{\n  \"foo\": \"bar\"\n}"
+  },
+  {
+    "name": "torawjson-object",
+    "function": "toRawJson",
+    "args": [
+      {
+        "foo": "bar",
+        "nested": {
+          "baz": 1
+        }
+      }
+    ],
+    "template": "{{ toRawJson .value }}",
+    "data": {
+      "value": {
+        "foo": "bar",
+        "nested": {
+          "baz": 1
+        }
+      }
+    },
+    "expected": "{\"foo\":\"bar\",\"nested\":{\"baz\":1}}"
+  },
+  {
+    "name": "musttorawjson-object",
+    "function": "mustToRawJson",
+    "args": [
+      {
+        "foo": "bar",
+        "nested": {
+          "baz": 1
+        }
+      }
+    ],
+    "template": "{{ mustToRawJson .value }}",
+    "data": {
+      "value": {
+        "foo": "bar",
+        "nested": {
+          "baz": 1
+        }
+      }
+    },
+    "expected": "{\"foo\":\"bar\",\"nested\":{\"baz\":1}}"
   },
   {
     "name": "substr-basic",
@@ -303,6 +553,25 @@
     ],
     "template": "{{ indent 2 \"line1\\nline2\" }}",
     "expected": "  line1\n  line2"
+  },
+  {
+    "name": "nindent-basic",
+    "function": "nindent",
+    "args": [
+      2,
+      "line1\nline2"
+    ],
+    "template": "{{ nindent 2 \"line1\\nline2\" }}",
+    "expected": "\n  line1\n  line2"
+  },
+  {
+    "name": "nospace-basic",
+    "function": "nospace",
+    "args": [
+      " spaced \n text "
+    ],
+    "template": "{{ nospace (printf \" spaced %s text \" \"\\n\") }}",
+    "expected": "spacedtext"
   },
   {
     "name": "compact-basic",

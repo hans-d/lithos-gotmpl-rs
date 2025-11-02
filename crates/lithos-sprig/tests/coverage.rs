@@ -26,10 +26,7 @@ fn every_registered_helper_has_fixture() {
     let registered: BTreeSet<String> = sprig_registry.function_names().into_iter().collect();
 
     let covered = collect_fixture_helpers(&sprig_registry, test_cases_dir());
-    let missing: Vec<String> = registered
-        .difference(&covered)
-        .cloned()
-        .collect();
+    let missing: Vec<String> = registered.difference(&covered).cloned().collect();
 
     assert!(
         missing.is_empty(),
@@ -38,7 +35,10 @@ fn every_registered_helper_has_fixture() {
     );
 }
 
-fn collect_fixture_helpers(registry: &lithos_gotmpl_core::FunctionRegistry, root: PathBuf) -> BTreeSet<String> {
+fn collect_fixture_helpers(
+    registry: &lithos_gotmpl_core::FunctionRegistry,
+    root: PathBuf,
+) -> BTreeSet<String> {
     let mut covered = BTreeSet::new();
     let combined_registry = sprig_functions();
 
@@ -73,9 +73,16 @@ fn collect_fixture_helpers(registry: &lithos_gotmpl_core::FunctionRegistry, root
                 let template_path = entry.path().join("input.tmpl");
                 if template_path.exists() {
                     let name = entry.file_name().to_string_lossy().into_owned();
-                    let source = fs::read_to_string(&template_path)
-                        .unwrap_or_else(|err| panic!("failed to read {}: {err}", template_path.display()));
-                    collect_from_template(registry, &combined_registry, &name, &source, &mut covered);
+                    let source = fs::read_to_string(&template_path).unwrap_or_else(|err| {
+                        panic!("failed to read {}: {err}", template_path.display())
+                    });
+                    collect_from_template(
+                        registry,
+                        &combined_registry,
+                        &name,
+                        &source,
+                        &mut covered,
+                    );
                 }
             }
         }
@@ -99,7 +106,9 @@ fn collect_from_template(
         .unwrap_or_else(|err| panic!("failed to parse template {name}: {err}"));
     let analysis = template.analyze();
     for call in analysis.functions {
-        if matches!(call.source, FunctionSource::Registered) && sprig_registry.get(&call.name).is_some() {
+        if matches!(call.source, FunctionSource::Registered)
+            && sprig_registry.get(&call.name).is_some()
+        {
             covered.insert(call.name);
         }
     }
