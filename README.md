@@ -50,7 +50,7 @@ assert_eq!(rendered, "Friend");
 
 ## Documentation
 
-Extended guides live under [`docs/`](docs/README.md). Highlights include:
+Extended guides live under [`docs/`](docs/index.md). Highlights include:
 
 - [Testing strategy](docs/guides/testing.md) – behavioural fixtures, the Go oracle, and when to add Rust-only assertions.
 - [Function coverage](docs/reference/function-coverage.md) – helper matrix covering Go built-ins and Sprig additions.

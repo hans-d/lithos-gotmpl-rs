@@ -41,7 +41,7 @@ repository.
 ## Documentation
 
 - Architectural overview lives in `README.md`.
-- `docs/README.md` indexes the extended documentation set.
+- `docs/index.md` indexes the extended documentation set.
 - Testing strategy and expectations are documented in `docs/guides/testing.md`.
 - Releasing instructions are in `docs/operations/releasing.md`.
 - Contributor guidance is in `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md`.
