@@ -164,12 +164,11 @@ mod tests {
     fn must_from_json_surfaces_parse_errors() {
         let mut ctx = ctx();
         let err = must_from_json(&mut ctx, &[json!("{invalid}")]).unwrap_err();
+        let message = err.to_string();
         assert!(
-            err
-                .to_string()
-                .starts_with("render error: mustFromJson failed:"),
+            message.starts_with("render error: mustFromJson failed:"),
             "unexpected error: {}",
-            err
+            message
         );
     }
 
