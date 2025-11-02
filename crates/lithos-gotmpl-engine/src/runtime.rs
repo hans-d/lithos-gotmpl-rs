@@ -99,6 +99,12 @@ pub struct EvalContext {
     functions: FunctionRegistry,
 }
 
+enum CommandResolution {
+    Function(Arc<Function>),
+    Identifier(String),
+    Expression,
+}
+
 impl EvalContext {
     /// Creates a new evaluation context seeded with the input data and helper registry.
     pub fn new(data: Value, functions: FunctionRegistry) -> Self {
@@ -158,36 +164,78 @@ impl EvalContext {
     }
 
     fn eval_command(&mut self, command: &Command, input: Option<Value>) -> Result<Value, Error> {
+        let resolution = self.resolve_command_target(command);
+        let args = self.prepare_command_args(command, input, &resolution)?;
+        self.execute_prepared_command(command, resolution, args)
+    }
+
+    fn resolve_command_target(&self, command: &Command) -> CommandResolution {
         if let Expression::Identifier(name) = &command.target {
             if let Some(func) = self.functions.get(name.as_str()) {
-                let mut args = Vec::new();
+                CommandResolution::Function(func)
+            } else {
+                CommandResolution::Identifier(name.clone())
+            }
+        } else {
+            CommandResolution::Expression
+        }
+    }
+
+    fn prepare_command_args(
+        &mut self,
+        command: &Command,
+        input: Option<Value>,
+        resolution: &CommandResolution,
+    ) -> Result<Vec<Value>, Error> {
+        match resolution {
+            CommandResolution::Function(_) => {
+                let mut args =
+                    Vec::with_capacity(command.args.len() + usize::from(input.is_some()));
                 for expr in &command.args {
                     args.push(self.eval_expression(expr)?);
                 }
                 if let Some(prev) = input {
                     args.push(prev);
                 }
-                return func(self, &args);
-            } else if !command.args.is_empty() || input.is_some() {
-                return Err(Error::render(format!("unknown function \"{name}\""), None));
+                Ok(args)
+            }
+            CommandResolution::Identifier(name) => {
+                if !command.args.is_empty() || input.is_some() {
+                    return Err(Error::render(format!("unknown function \"{name}\""), None));
+                }
+                Ok(Vec::new())
+            }
+            CommandResolution::Expression => {
+                if !command.args.is_empty() {
+                    return Err(Error::render(
+                        "arguments supplied to non-function expression",
+                        None,
+                    ));
+                }
+                if input.is_some() {
+                    return Err(Error::render(
+                        "cannot pipe value into non-function expression",
+                        None,
+                    ));
+                }
+                Ok(Vec::new())
             }
         }
+    }
 
-        if !command.args.is_empty() {
-            return Err(Error::render(
-                "arguments supplied to non-function expression",
-                None,
-            ));
+    fn execute_prepared_command(
+        &mut self,
+        command: &Command,
+        resolution: CommandResolution,
+        args: Vec<Value>,
+    ) -> Result<Value, Error> {
+        match resolution {
+            CommandResolution::Function(func) => func(self, &args),
+            CommandResolution::Identifier(_) | CommandResolution::Expression => {
+                debug_assert!(args.is_empty());
+                self.eval_expression(&command.target)
+            }
         }
-
-        if input.is_some() {
-            return Err(Error::render(
-                "cannot pipe value into non-function expression",
-                None,
-            ));
-        }
-
-        self.eval_expression(&command.target)
     }
 
     fn eval_expression(&mut self, expr: &Expression) -> Result<Value, Error> {
@@ -372,6 +420,120 @@ impl EvalContext {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn registry_with_echo() -> FunctionRegistry {
+        let mut builder = FunctionRegistry::builder();
+        builder.register("echo", |_, args| {
+            Ok(args.first().cloned().unwrap_or(Value::Null))
+        });
+        FunctionRegistry::from_builder(builder)
+    }
+
+    #[test]
+    fn resolve_command_target_detects_function() {
+        let registry = registry_with_echo();
+        let ctx = EvalContext::new(Value::Null, registry);
+        let command = Command::new(Expression::Identifier("echo".into()), Vec::new());
+
+        assert!(matches!(
+            ctx.resolve_command_target(&command),
+            CommandResolution::Function(_)
+        ));
+    }
+
+    #[test]
+    fn resolve_command_target_identifies_expression() {
+        let registry = FunctionRegistry::empty();
+        let mut ctx = EvalContext::new(json!({"name": "lithos"}), registry);
+        let command = Command::new(Expression::Identifier("name".into()), Vec::new());
+
+        let resolution = ctx.resolve_command_target(&command);
+        let args = ctx
+            .prepare_command_args(&command, None, &resolution)
+            .expect("identifier without args should succeed");
+        let value = ctx
+            .execute_prepared_command(&command, resolution, args)
+            .expect("expression should evaluate");
+
+        assert_eq!(value, json!("lithos"));
+    }
+
+    #[test]
+    fn prepare_command_args_errors_on_unknown_function_with_args() {
+        let registry = FunctionRegistry::empty();
+        let mut ctx = EvalContext::new(Value::Null, registry);
+        let command = Command::new(
+            Expression::Identifier("missing".into()),
+            vec![Expression::StringLiteral("arg".into())],
+        );
+
+        let resolution = ctx.resolve_command_target(&command);
+        let err = ctx
+            .prepare_command_args(&command, None, &resolution)
+            .expect_err("should reject unknown function with args");
+        assert!(err.to_string().contains("unknown function"));
+    }
+
+    #[test]
+    fn prepare_command_args_collects_values_for_functions() {
+        let registry = registry_with_echo();
+        let mut ctx = EvalContext::new(Value::Null, registry);
+        let command = Command::new(
+            Expression::Identifier("echo".into()),
+            vec![Expression::NumberLiteral("7".into())],
+        );
+
+        let resolution = ctx.resolve_command_target(&command);
+        let args = ctx
+            .prepare_command_args(&command, Some(Value::Bool(false)), &resolution)
+            .expect("function arguments should prepare");
+
+        assert_eq!(args.len(), 2);
+        assert_eq!(args[1], Value::Bool(false));
+    }
+
+    #[test]
+    fn execute_prepared_command_invokes_function() {
+        let mut builder = FunctionRegistry::builder();
+        builder.register("count", |_, args| {
+            Ok(Value::Number(Number::from(args.len())))
+        });
+        let registry = FunctionRegistry::from_builder(builder);
+        let mut ctx = EvalContext::new(Value::Null, registry);
+        let command = Command::new(Expression::Identifier("count".into()), Vec::new());
+
+        let resolution = ctx.resolve_command_target(&command);
+        let args = ctx
+            .prepare_command_args(&command, Some(Value::Null), &resolution)
+            .expect("function arguments should prepare");
+        let value = ctx
+            .execute_prepared_command(&command, resolution, args)
+            .expect("function should execute");
+
+        assert_eq!(value, Value::Number(Number::from(1))); // includes piped value
+    }
+
+    #[test]
+    fn prepare_command_args_rejects_piped_expression() {
+        let registry = FunctionRegistry::empty();
+        let mut ctx = EvalContext::new(Value::Null, registry);
+        let command = Command::new(Expression::BoolLiteral(true), Vec::new());
+
+        let resolution = ctx.resolve_command_target(&command);
+        let err = ctx
+            .prepare_command_args(&command, Some(Value::Null), &resolution)
+            .expect_err("piping into expression should error");
+
+        assert!(err
+            .to_string()
+            .contains("cannot pipe value into non-function expression"));
     }
 }
 

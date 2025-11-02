@@ -27,161 +27,7 @@ pub fn parse_template(name: &str, source: &str) -> Result<Ast, Error> {
     let mut target_stack: Vec<AppendTarget> = vec![AppendTarget::Root];
 
     while cursor < bytes.len() {
-        if let Some(open) = find_action_start(bytes, cursor) {
-            if open > cursor {
-                let text = &source[cursor..open];
-                if !text.is_empty() {
-                    push_node(
-                        &mut root,
-                        &mut control_stack,
-                        &target_stack,
-                        Node::Text(TextNode::new(Span::new(cursor, open), text.to_string())),
-                    );
-                }
-            }
-
-            match find_action_end(bytes, open + 2) {
-                Some(close) => {
-                    let mut body_start = open + 2;
-                    let mut body_end = close;
-                    let mut trim_left = false;
-                    let mut trim_right = false;
-
-                    if body_start < close && bytes[body_start] == b'-' {
-                        trim_left = true;
-                        body_start += 1;
-                    }
-                    if body_start < body_end && bytes[body_end - 1] == b'-' {
-                        trim_right = true;
-                        body_end -= 1;
-                    }
-
-                    if trim_left {
-                        // Mirror Go's behaviour: when `{{-` is used, trim
-                        // trailing whitespace from the text that preceded this
-                        // action/comment before appending the new node.
-                        let block = current_block_mut(&mut root, &mut control_stack, &target_stack);
-                        trim_trailing_whitespace(block);
-                    }
-
-                    let action_span = Span::new(open, close + 2);
-                    let action_raw = &source[body_start..body_end];
-                    let action_body = action_raw.trim();
-
-                    if is_potential_comment(action_body) && !action_body.ends_with("*/") {
-                        return Err(Error::parse_with_span("unclosed comment", action_span));
-                    }
-
-                    if is_comment(action_body) {
-                        push_node(
-                            &mut root,
-                            &mut control_stack,
-                            &target_stack,
-                            Node::Comment(CommentNode::new(
-                                action_span,
-                                strip_comment(action_body),
-                                trim_left,
-                                trim_right,
-                            )),
-                        );
-                    } else {
-                        let tokens = lexer::lex_action(action_body, body_start)?;
-
-                        if tokens.is_empty() {
-                            return Err(Error::parse_with_span("empty action", action_span));
-                        }
-
-                        match classify_action(&tokens)? {
-                            ActionKind::If => {
-                                let condition_tokens: Vec<_> = tokens[1..].to_vec();
-                                let condition_pipeline = parse_action_pipeline(&condition_tokens)?;
-                                let frame = ControlFrame::new(
-                                    ControlKind::If,
-                                    action_span,
-                                    condition_tokens,
-                                    condition_pipeline,
-                                );
-                                control_stack.push(frame);
-                                let idx = control_stack.len() - 1;
-                                target_stack.push(AppendTarget::Then(idx));
-                            }
-                            ActionKind::Range => {
-                                let condition_tokens: Vec<_> = tokens[1..].to_vec();
-                                let condition_pipeline = parse_action_pipeline(&condition_tokens)?;
-                                let frame = ControlFrame::new(
-                                    ControlKind::Range,
-                                    action_span,
-                                    condition_tokens,
-                                    condition_pipeline,
-                                );
-                                control_stack.push(frame);
-                                let idx = control_stack.len() - 1;
-                                target_stack.push(AppendTarget::Then(idx));
-                            }
-                            ActionKind::With => {
-                                let condition_tokens: Vec<_> = tokens[1..].to_vec();
-                                let condition_pipeline = parse_action_pipeline(&condition_tokens)?;
-                                let frame = ControlFrame::new(
-                                    ControlKind::With,
-                                    action_span,
-                                    condition_tokens,
-                                    condition_pipeline,
-                                );
-                                control_stack.push(frame);
-                                let idx = control_stack.len() - 1;
-                                target_stack.push(AppendTarget::Then(idx));
-                            }
-                            ActionKind::Else => {
-                                handle_else(&mut control_stack, &mut target_stack, action_span)?;
-                            }
-                            ActionKind::End => {
-                                handle_end(
-                                    &mut root,
-                                    &mut control_stack,
-                                    &mut target_stack,
-                                    action_span,
-                                )?;
-                            }
-                            ActionKind::Regular => {
-                                let pipeline = parse_action_pipeline(&tokens)?;
-                                push_node(
-                                    &mut root,
-                                    &mut control_stack,
-                                    &target_stack,
-                                    Node::Action(ActionNode::new(
-                                        action_span,
-                                        action_body.to_string(),
-                                        tokens,
-                                        pipeline,
-                                        trim_left,
-                                        trim_right,
-                                    )),
-                                );
-                            }
-                        }
-                    }
-
-                    cursor = close + 2;
-                    if trim_right {
-                        cursor = skip_leading_whitespace(bytes, cursor);
-                    }
-                }
-                None => {
-                    let mut remainder = &source[open + 2..];
-                    remainder = remainder.trim_start();
-                    if let Some(rest) = remainder.strip_prefix('-') {
-                        remainder = rest.trim_start();
-                    }
-
-                    let span = Span::new(open, source.len());
-                    if remainder.starts_with("/*") {
-                        return Err(Error::parse_with_span("unclosed comment", span));
-                    }
-
-                    return Err(Error::parse_with_span("unclosed action", span));
-                }
-            }
-        } else {
+        let Some(open) = find_action_start(bytes, cursor) else {
             let text = &source[cursor..];
             if !text.is_empty() {
                 push_node(
@@ -195,6 +41,131 @@ pub fn parse_template(name: &str, source: &str) -> Result<Ast, Error> {
                 );
             }
             break;
+        };
+
+        if open > cursor {
+            let text = &source[cursor..open];
+            if !text.is_empty() {
+                push_node(
+                    &mut root,
+                    &mut control_stack,
+                    &target_stack,
+                    Node::Text(TextNode::new(Span::new(cursor, open), text.to_string())),
+                );
+            }
+        }
+
+        match find_action_end(bytes, open + 2) {
+            Some(close) => {
+                let window = trim_action_delimiters(source, bytes, open, close);
+
+                if window.trim_left {
+                    let block = current_block_mut(&mut root, &mut control_stack, &target_stack);
+                    trim_trailing_whitespace(block);
+                }
+
+                if is_potential_comment(window.body) && !window.body.ends_with("*/") {
+                    return Err(Error::parse_with_span("unclosed comment", window.span));
+                }
+
+                if is_comment(window.body) {
+                    push_node(
+                        &mut root,
+                        &mut control_stack,
+                        &target_stack,
+                        Node::Comment(CommentNode::new(
+                            window.span,
+                            strip_comment(window.body),
+                            window.trim_left,
+                            window.trim_right,
+                        )),
+                    );
+                } else {
+                    let tokens = lexer::lex_action(window.body, window.body_start)?;
+
+                    if tokens.is_empty() {
+                        return Err(Error::parse_with_span("empty action", window.span));
+                    }
+
+                    match classify_action(&tokens)? {
+                        ActionKind::If => {
+                            let condition_tokens: Vec<_> = tokens[1..].to_vec();
+                            let condition_pipeline = parse_action_pipeline(&condition_tokens)?;
+                            let frame = ControlFrame::new(
+                                ControlKind::If,
+                                window.span,
+                                condition_tokens,
+                                condition_pipeline,
+                            );
+                            push_control_frame(&mut control_stack, &mut target_stack, frame);
+                        }
+                        ActionKind::Range => {
+                            let condition_tokens: Vec<_> = tokens[1..].to_vec();
+                            let condition_pipeline = parse_action_pipeline(&condition_tokens)?;
+                            let frame = ControlFrame::new(
+                                ControlKind::Range,
+                                window.span,
+                                condition_tokens,
+                                condition_pipeline,
+                            );
+                            push_control_frame(&mut control_stack, &mut target_stack, frame);
+                        }
+                        ActionKind::With => {
+                            let condition_tokens: Vec<_> = tokens[1..].to_vec();
+                            let condition_pipeline = parse_action_pipeline(&condition_tokens)?;
+                            let frame = ControlFrame::new(
+                                ControlKind::With,
+                                window.span,
+                                condition_tokens,
+                                condition_pipeline,
+                            );
+                            push_control_frame(&mut control_stack, &mut target_stack, frame);
+                        }
+                        ActionKind::Else => {
+                            handle_else(&mut control_stack, &mut target_stack, window.span)?;
+                        }
+                        ActionKind::End => {
+                            close_control_frame(
+                                &mut root,
+                                &mut control_stack,
+                                &mut target_stack,
+                                window.span,
+                            )?;
+                        }
+                        ActionKind::Regular => {
+                            let pipeline = parse_action_pipeline(&tokens)?;
+                            let node = build_action_node(
+                                window.span,
+                                window.body,
+                                tokens,
+                                pipeline,
+                                window.trim_left,
+                                window.trim_right,
+                            );
+                            push_node(&mut root, &mut control_stack, &target_stack, node);
+                        }
+                    }
+                }
+
+                cursor = close + 2;
+                if window.trim_right {
+                    cursor = skip_leading_whitespace(bytes, cursor);
+                }
+            }
+            None => {
+                let mut remainder = &source[open + 2..];
+                remainder = remainder.trim_start();
+                if let Some(rest) = remainder.strip_prefix('-') {
+                    remainder = rest.trim_start();
+                }
+
+                let span = Span::new(open, source.len());
+                if remainder.starts_with("/*") {
+                    return Err(Error::parse_with_span("unclosed comment", span));
+                }
+
+                return Err(Error::parse_with_span("unclosed action", span));
+            }
         }
     }
 
@@ -215,6 +186,51 @@ pub fn parse_template(name: &str, source: &str) -> Result<Ast, Error> {
     }
 
     Ok(Ast::new(name, root))
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ActionWindow<'a> {
+    span: Span,
+    body_start: usize,
+    body: &'a str,
+    trim_left: bool,
+    trim_right: bool,
+}
+
+fn trim_action_delimiters<'a>(
+    source: &'a str,
+    bytes: &[u8],
+    open: usize,
+    close: usize,
+) -> ActionWindow<'a> {
+    let mut body_start = open + 2;
+    let mut body_end = close;
+    let mut trim_left = false;
+    let mut trim_right = false;
+
+    if body_start < close && bytes[body_start] == b'-' {
+        trim_left = true;
+        body_start += 1;
+    }
+    if body_start < body_end && bytes[body_end - 1] == b'-' {
+        trim_right = true;
+        body_end -= 1;
+    }
+
+    let span = Span::new(open, close + 2);
+    let raw = &source[body_start..body_end];
+    let trimmed_start = raw.trim_start();
+    let prefix_len = raw.len() - trimmed_start.len();
+    let body = trimmed_start.trim_end();
+    body_start += prefix_len;
+
+    ActionWindow {
+        span,
+        body_start,
+        body,
+        trim_left,
+        trim_right,
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -361,6 +377,34 @@ fn push_node(
     block.push(node);
 }
 
+fn build_action_node(
+    span: Span,
+    body: &str,
+    tokens: Vec<Token>,
+    pipeline: Pipeline,
+    trim_left: bool,
+    trim_right: bool,
+) -> Node {
+    Node::Action(ActionNode::new(
+        span,
+        body.to_string(),
+        tokens,
+        pipeline,
+        trim_left,
+        trim_right,
+    ))
+}
+
+fn push_control_frame(
+    controls: &mut Vec<ControlFrame>,
+    targets: &mut Vec<AppendTarget>,
+    frame: ControlFrame,
+) {
+    controls.push(frame);
+    let idx = controls.len() - 1;
+    targets.push(AppendTarget::Then(idx));
+}
+
 fn handle_else(
     controls: &mut [ControlFrame],
     targets: &mut [AppendTarget],
@@ -396,7 +440,7 @@ fn handle_else(
 }
 
 #[allow(clippy::ptr_arg)]
-fn handle_end(
+fn close_control_frame(
     root: &mut Block,
     controls: &mut Vec<ControlFrame>,
     targets: &mut Vec<AppendTarget>,
@@ -869,6 +913,48 @@ fn find_action_end(bytes: &[u8], from: usize) -> Option<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn trim_action_delimiters_reports_flags() {
+        let source = "{{- foo -}}";
+        let bytes = source.as_bytes();
+        let open = find_action_start(bytes, 0).expect("missing action start");
+        let close = find_action_end(bytes, open + 2).expect("missing action end");
+        let window = trim_action_delimiters(source, bytes, open, close);
+
+        assert!(window.trim_left);
+        assert!(window.trim_right);
+        assert_eq!(window.body, "foo");
+        assert_eq!(window.body_start, 4);
+        assert_eq!(window.span, Span::new(0, source.len()));
+    }
+
+    #[test]
+    fn control_frame_helpers_manage_stack() {
+        let mut root = Block::default();
+        let mut controls = Vec::new();
+        let mut targets = vec![AppendTarget::Root];
+        let pipeline = Pipeline::new(
+            None,
+            vec![Command::new(Expression::BoolLiteral(true), Vec::new())],
+        );
+        let frame = ControlFrame::new(ControlKind::If, Span::new(0, 10), Vec::new(), pipeline);
+
+        push_control_frame(&mut controls, &mut targets, frame);
+        assert_eq!(controls.len(), 1);
+        assert!(matches!(targets.last(), Some(AppendTarget::Then(0))));
+
+        controls[0]
+            .then_block
+            .push(Node::Text(TextNode::new(Span::new(10, 12), "ok")));
+
+        close_control_frame(&mut root, &mut controls, &mut targets, Span::new(12, 20))
+            .expect("closing control frame should succeed");
+
+        assert!(controls.is_empty());
+        assert!(matches!(targets.as_slice(), [AppendTarget::Root]));
+        assert!(matches!(root.nodes.first(), Some(Node::If(_))));
+    }
 
     #[test]
     fn find_action_end_handles_comment_with_quotes() {
