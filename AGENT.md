@@ -41,7 +41,7 @@ repository.
 ## Documentation
 
 - Architectural overview lives in `README.md`.
-- Releasing instructions are in `docs/releasing.md`.
+- Releasing instructions are in `docs/operations/releasing.md`.
 - Contributor guidance is in `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md`.
 
 ## Miscellaneous
