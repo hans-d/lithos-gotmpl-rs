@@ -13,6 +13,9 @@ defaults:
   run:
     shell: bash
 
+env:
+  JUST_VERSION: "1.36.0"
+
 # yamllint disable-line rule:truthy
 on:
   schedule:
@@ -98,9 +101,18 @@ jobs:
 
       - name: Install just & cargo-mutants
         run: |
+          set -euo pipefail
           if ! command -v just >/dev/null 2>&1; then
-            curl -LsSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+            archive="just-v${JUST_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+            url="https://github.com/casey/just/releases/download/v${JUST_VERSION}/${archive}"
+            tmpdir="$(mktemp -d)"
+            trap 'rm -rf "${tmpdir}"' EXIT
+            curl --fail --location --show-error --retry 5 --retry-delay 2 "${url}" -o "${tmpdir}/${archive}"
+            tar -xzf "${tmpdir}/${archive}" -C "${tmpdir}"
+            mkdir -p "${HOME}/.local/bin"
+            install -m 0755 "${tmpdir}/just" "${HOME}/.local/bin/just"
           fi
+          echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
           if ! command -v cargo-mutants >/dev/null 2>&1; then
             cargo install --locked cargo-mutants
           fi
