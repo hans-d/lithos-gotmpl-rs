@@ -842,6 +842,22 @@ mod tests {
     use super::*;
 
     #[test]
+    fn find_action_end_handles_comment_with_quotes() {
+        let input = b"{{/* comment with \" unmatched */}} tail";
+        let start = find_action_start(input, 0).expect("missing action start");
+        let end = find_action_end(input, start + 2).expect("should find closing braces");
+        assert_eq!(&input[end..end + 2], b"}}");
+    }
+
+    #[test]
+    fn find_action_end_handles_comment_with_backticks() {
+        let input = b"{{/* comment with ` unmatched */}} tail";
+        let start = find_action_start(input, 0).expect("missing action start");
+        let end = find_action_end(input, start + 2).expect("should find closing braces");
+        assert_eq!(&input[end..end + 2], b"}}");
+    }
+
+    #[test]
     fn parses_text_and_actions() {
         let src = "hello {{world}}!";
         let ast = parse_template("test", src).unwrap();
