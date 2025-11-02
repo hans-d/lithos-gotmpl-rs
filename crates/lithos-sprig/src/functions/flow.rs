@@ -141,16 +141,41 @@ mod tests {
     }
 
     #[test]
-    fn default_prefers_non_empty() {
+    fn default_requires_two_arguments() {
         let mut ctx = ctx();
-        let val = default(&mut ctx, &[json!("fallback"), json!("value")]).unwrap();
-        assert_eq!(val, json!("value"));
+        let err = default(&mut ctx, &[json!("fallback")]).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "render error: default expected at least 2 arguments, got 1"
+        );
     }
 
     #[test]
-    fn fail_returns_render_error() {
+    fn ternary_rejects_wrong_argument_count() {
         let mut ctx = ctx();
-        let err = fail(&mut ctx, &[json!("boom")]).unwrap_err();
-        assert_eq!(err.to_string(), "render error: boom");
+        let err = ternary(&mut ctx, &[json!("true"), json!("false")]).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "render error: ternary expected 3 arguments, got 2"
+        );
+    }
+
+    #[test]
+    fn must_from_json_surfaces_parse_errors() {
+        let mut ctx = ctx();
+        let err = must_from_json(&mut ctx, &[json!("{invalid}")]).unwrap_err();
+        let message = err.to_string();
+        assert!(
+            message.starts_with("render error: mustFromJson failed:"),
+            "unexpected error: {}",
+            message
+        );
+    }
+
+    #[test]
+    fn fail_joins_arguments_with_spaces() {
+        let mut ctx = ctx();
+        let err = fail(&mut ctx, &[json!("boom"), json!(123)]).unwrap_err();
+        assert_eq!(err.to_string(), "render error: boom 123");
     }
 }
