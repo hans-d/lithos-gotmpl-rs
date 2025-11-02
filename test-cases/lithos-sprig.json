@@ -232,11 +232,11 @@
     "function": "splitn",
     "args": [
       ",",
-      2,
-      "a,b,c"
+      "a,b,c",
+      2
     ],
-    "template": "{{ toJson (splitn \",\" 2 \"a,b,c\") }}",
-    "expected": "{\"_0\":\"a\",\"_1\":\"b,c\"}"
+    "template": "{{ toJson (splitn \",\" \"a,b,c\" 2) }}",
+    "expected": "[\"a\",\"b,c\"]"
   },
   {
     "name": "join-basic",

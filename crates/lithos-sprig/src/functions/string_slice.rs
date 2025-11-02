@@ -39,13 +39,13 @@ pub fn split_map(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error>
 pub fn splitn(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
     expect_exact_args("splitn", args, 3)?;
     let sep = expect_string("splitn", &args[0], 1)?;
-    let count = super::expect_usize("splitn", &args[1], 2)?;
-    let text = expect_string("splitn", &args[2], 3)?;
-    let mut map = Map::new();
-    for (idx, part) in text.splitn(count, &sep).enumerate() {
-        map.insert(format!("_{idx}"), Value::String(part.to_string()));
-    }
-    Ok(Value::Object(map))
+    let text = expect_string("splitn", &args[1], 2)?;
+    let count = super::expect_usize("splitn", &args[2], 3)?;
+    Ok(Value::Array(
+        text.splitn(count, &sep)
+            .map(|part| Value::String(part.to_string()))
+            .collect(),
+    ))
 }
 
 pub fn join(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
@@ -98,7 +98,7 @@ mod tests {
     #[test]
     fn splitn_truncates_to_requested_segments() {
         let mut ctx = ctx();
-        let out = splitn(&mut ctx, &[json!(","), json!(2), json!("a,b,c")]).unwrap();
-        assert_eq!(out, json!({"_0": "a", "_1": "b,c"}));
+        let out = splitn(&mut ctx, &[json!(","), json!("a,b,c"), json!(2)]).unwrap();
+        assert_eq!(out, json!(["a", "b,c"]));
     }
 }
