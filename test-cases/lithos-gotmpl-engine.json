@@ -37,5 +37,11 @@
       "secondary": true
     },
     "expected": "B"
+  },
+  {
+    "name": "else-with-is-invalid",
+    "template": "{{ if true }}A{{ else with . }}B{{ end }}",
+    "data": {},
+    "error": "invalid else-if: expected 'if' after 'else'"
   }
 ]
