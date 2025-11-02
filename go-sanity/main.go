@@ -48,26 +48,31 @@ type result struct {
 func main() {
 	defaultCases := filepath.Join("..", "test-cases", "lithos-sprig.json")
 	casesPath := flag.String("cases", defaultCases, "path to JSON file with function cases")
+	includeSprig := flag.Bool("sprig", true, "include Sprig helper functions")
 	flag.Parse()
 
-	if err := run(os.Stdout, *casesPath); err != nil {
+	if err := run(os.Stdout, *casesPath, *includeSprig); err != nil {
 		fail(err)
 	}
 }
 
-func run(output io.Writer, casesPath string) error {
+func run(output io.Writer, casesPath string, includeSprig bool) error {
 	cases, err := loadCases(casesPath)
 	if err != nil {
 		return err
 	}
 
-	funcs := sprig.GenericFuncMap()
-	funcs["splitn"] = func(sep, text string, n int) []string {
-		return strings.SplitN(text, sep, n)
+	var funcs map[string]interface{}
+	if includeSprig {
+		funcs = sprig.GenericFuncMap()
+		funcs["splitn"] = func(sep, text string, n int) []string {
+			return strings.SplitN(text, sep, n)
+		}
 	}
+
 	results := make([]result, 0, len(cases))
 	for _, c := range cases {
-		res, errs := evaluateCase(funcs, c)
+		res, errs := evaluateCase(funcs, includeSprig, c)
 		if errMsg := collectErrors(errs); errMsg != "" {
 			res.Error = errMsg
 		}
@@ -82,7 +87,7 @@ func run(output io.Writer, casesPath string) error {
 	return nil
 }
 
-func evaluateCase(funcs map[string]interface{}, c testCase) (result, []error) {
+func evaluateCase(funcs map[string]interface{}, includeSprig bool, c testCase) (result, []error) {
 	res := result{
 		Name:     c.Name,
 		Function: c.Function,
@@ -95,16 +100,20 @@ func evaluateCase(funcs map[string]interface{}, c testCase) (result, []error) {
 	var errs []error
 
 	if c.Function != "" {
-		out, err := evaluate(funcs, c.Function, c.Args)
-		if err != nil {
-			errs = append(errs, err)
+		if funcs == nil {
+			errs = append(errs, fmt.Errorf("function %q requested but Sprig helpers are disabled", c.Function))
 		} else {
-			res.Output = out
+			out, err := evaluate(funcs, c.Function, c.Args)
+			if err != nil {
+				errs = append(errs, err)
+			} else {
+				res.Output = out
+			}
 		}
 	}
 
 	if c.Template != "" {
-		rendered, err := renderTemplate(c.Template, c.Data)
+		rendered, err := renderTemplate(c.Template, c.Data, includeSprig)
 		if err != nil {
 			errs = append(errs, err)
 		} else {
@@ -181,19 +190,23 @@ func evaluate(funcs map[string]interface{}, name string, args []interface{}) (in
 	return out, nil
 }
 
-func renderTemplate(tpl string, data interface{}) (string, error) {
-	funcs := sprig.TxtFuncMap()
-	funcs["splitn"] = func(sep, text string, n int) []string {
-		return strings.SplitN(text, sep, n)
+func renderTemplate(tpl string, data interface{}, includeSprig bool) (string, error) {
+	tmpl := texttmpl.New("case")
+	if includeSprig {
+		funcs := sprig.TxtFuncMap()
+		funcs["splitn"] = func(sep, text string, n int) []string {
+			return strings.SplitN(text, sep, n)
+		}
+		tmpl = tmpl.Funcs(funcs)
 	}
 
-	tmpl, err := texttmpl.New("case").Funcs(funcs).Parse(tpl)
+	parsed, err := tmpl.Parse(tpl)
 	if err != nil {
 		return "", fmt.Errorf("parse template: %w", err)
 	}
 
 	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
+	if err := parsed.Execute(&buf, data); err != nil {
 		return "", fmt.Errorf("execute template: %w", err)
 	}
 	return buf.String(), nil

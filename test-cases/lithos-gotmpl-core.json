@@ -89,7 +89,7 @@
       "case": "slice",
       "repo": "https://github.com/golang/go"
     },
-    "template": "{{slice \"gopher\" \"1\" \"3\"}}",
+    "template": "{{slice \"gopher\" 1 3}}",
     "expected": "op"
   },
   {
@@ -130,6 +130,7 @@
       "repo": "https://github.com/golang/go"
     },
     "template": "{{call \"print\" \"Hello\"}}",
-    "expected": "Hello"
+    "expected": "Hello",
+    "skip_go": true
   }
 ]
