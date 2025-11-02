@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -49,59 +50,82 @@ func main() {
 	casesPath := flag.String("cases", defaultCases, "path to JSON file with function cases")
 	flag.Parse()
 
-	cases, err := loadCases(*casesPath)
-	if err != nil {
+	if err := run(os.Stdout, *casesPath); err != nil {
 		fail(err)
+	}
+}
+
+func run(output io.Writer, casesPath string) error {
+	cases, err := loadCases(casesPath)
+	if err != nil {
+		return err
 	}
 
 	funcs := sprig.GenericFuncMap()
 	results := make([]result, 0, len(cases))
 	for _, c := range cases {
-		res := result{
-			Name:     c.Name,
-			Function: c.Function,
-			Args:     c.Args,
-			Template: c.Template,
-			Data:     c.Data,
-			Expected: c.Expected,
+		res, errs := evaluateCase(funcs, c)
+		if errMsg := collectErrors(errs); errMsg != "" {
+			res.Error = errMsg
 		}
-
-		var errs []string
-
-		if c.Function != "" {
-			out, evalErr := evaluate(funcs, c.Function, c.Args)
-			if evalErr != nil {
-				errs = append(errs, evalErr.Error())
-			} else {
-				res.Output = out
-			}
-		}
-
-		if c.Template != "" {
-			rendered, err := renderTemplate(c.Template, c.Data)
-			if err != nil {
-				errs = append(errs, err.Error())
-			} else {
-				renderedCopy := rendered
-				res.Rendered = &renderedCopy
-				if c.Expected != nil && rendered != *c.Expected {
-					errs = append(errs, fmt.Sprintf("template output %q does not match expected %q", rendered, *c.Expected))
-				}
-			}
-		}
-
-		if len(errs) > 0 {
-			res.Error = strings.Join(errs, "; ")
-		}
-
 		results = append(results, res)
 	}
 
-	encoder := json.NewEncoder(os.Stdout)
+	encoder := json.NewEncoder(output)
 	encoder.SetIndent("", "  ")
 	if err := encoder.Encode(results); err != nil {
-		fail(err)
+		return fmt.Errorf("encode results: %w", err)
 	}
+	return nil
+}
+
+func evaluateCase(funcs map[string]interface{}, c testCase) (result, []error) {
+	res := result{
+		Name:     c.Name,
+		Function: c.Function,
+		Args:     c.Args,
+		Template: c.Template,
+		Data:     c.Data,
+		Expected: c.Expected,
+	}
+
+	var errs []error
+
+	if c.Function != "" {
+		out, err := evaluate(funcs, c.Function, c.Args)
+		if err != nil {
+			errs = append(errs, err)
+		} else {
+			res.Output = out
+		}
+	}
+
+	if c.Template != "" {
+		rendered, err := renderTemplate(c.Template, c.Data)
+		if err != nil {
+			errs = append(errs, err)
+		} else {
+			renderedCopy := rendered
+			res.Rendered = &renderedCopy
+			if c.Expected != nil && rendered != *c.Expected {
+				errs = append(errs, fmt.Errorf("template output %q does not match expected %q", rendered, *c.Expected))
+			}
+		}
+	}
+
+	return res, errs
+}
+
+func collectErrors(errs []error) string {
+	if len(errs) == 0 {
+		return ""
+	}
+
+	messages := make([]string, len(errs))
+	for i, err := range errs {
+		messages[i] = err.Error()
+	}
+	return strings.Join(messages, "; ")
 }
 
 // loadCases reads the JSON file containing lithos-sprig test vectors.
@@ -170,17 +194,8 @@ func renderTemplate(tpl string, data interface{}) (string, error) {
 func prepareArgs(args []interface{}, fnType reflect.Type) ([]reflect.Value, error) {
 	prepared := make([]reflect.Value, len(args))
 	for i, arg := range args {
-		targetIndex := i
-		if fnType.IsVariadic() && i >= fnType.NumIn()-1 {
-			targetIndex = fnType.NumIn() - 1
-		}
-
-		targetType := fnType.In(targetIndex)
-		if fnType.IsVariadic() && i >= fnType.NumIn()-1 {
-			targetType = targetType.Elem()
-		}
-
-		val, err := coerce(arg, targetType)
+		targetType := targetArgumentType(fnType, i)
+		val, err := coerceArgument(arg, targetType)
 		if err != nil {
 			return nil, fmt.Errorf("argument %d: %w", i+1, err)
 		}
@@ -189,31 +204,87 @@ func prepareArgs(args []interface{}, fnType reflect.Type) ([]reflect.Value, erro
 	return prepared, nil
 }
 
-func coerce(arg interface{}, targetType reflect.Type) (reflect.Value, error) {
-	if arg == nil {
-		return zero(targetType), nil
+func targetArgumentType(fnType reflect.Type, index int) reflect.Type {
+	targetIndex := index
+	if fnType.IsVariadic() && index >= fnType.NumIn()-1 {
+		targetIndex = fnType.NumIn() - 1
 	}
 
-	if targetType.Kind() == reflect.Interface {
-		return reflect.ValueOf(arg), nil
+	targetType := fnType.In(targetIndex)
+	if fnType.IsVariadic() && index >= fnType.NumIn()-1 {
+		targetType = targetType.Elem()
 	}
+	return targetType
+}
 
+type coercionStrategy func(arg interface{}, targetType reflect.Type) (reflect.Value, bool, error)
+
+var strategies = []coercionStrategy{
+	coerceNilArg,
+	coerceInterfaceArg,
+	coerceNumberArg,
+	coercePrimitiveArg,
+}
+
+func coerceArgument(arg interface{}, targetType reflect.Type) (reflect.Value, error) {
+	for _, strategy := range strategies {
+		if val, handled, err := strategy(arg, targetType); handled {
+			if err != nil {
+				return reflect.Value{}, err
+			}
+			return val, nil
+		} else if err != nil {
+			return reflect.Value{}, err
+		}
+	}
+	return reflect.Value{}, fmt.Errorf("cannot coerce %T into %s", arg, targetType.String())
+}
+
+func coerceNilArg(arg interface{}, targetType reflect.Type) (reflect.Value, bool, error) {
+	if arg != nil {
+		return reflect.Value{}, false, nil
+	}
+	return zero(targetType), true, nil
+}
+
+func coerceInterfaceArg(arg interface{}, targetType reflect.Type) (reflect.Value, bool, error) {
+	if targetType.Kind() != reflect.Interface {
+		return reflect.Value{}, false, nil
+	}
+	return reflect.ValueOf(arg), true, nil
+}
+
+func coerceNumberArg(arg interface{}, targetType reflect.Type) (reflect.Value, bool, error) {
 	switch v := arg.(type) {
 	case json.Number:
-		return convertNumber(v, targetType)
+		val, err := convertNumber(v, targetType)
+		return val, true, err
 	case float64:
-		return convertFloat64(v, targetType)
+		val, err := convertFloat64(v, targetType)
+		return val, true, err
 	}
+	return reflect.Value{}, false, nil
+}
 
+func coercePrimitiveArg(arg interface{}, targetType reflect.Type) (reflect.Value, bool, error) {
 	original := reflect.ValueOf(arg)
+	if !original.IsValid() {
+		return reflect.Value{}, false, nil
+	}
+	if val, ok := convertPrimitive(original, targetType); ok {
+		return val, true, nil
+	}
+	return reflect.Value{}, false, nil
+}
+
+func convertPrimitive(original reflect.Value, targetType reflect.Type) (reflect.Value, bool) {
 	if original.Type().AssignableTo(targetType) {
-		return original, nil
+		return original, true
 	}
 	if original.Type().ConvertibleTo(targetType) {
-		return original.Convert(targetType), nil
+		return original.Convert(targetType), true
 	}
-
-	return reflect.Value{}, fmt.Errorf("cannot coerce %T into %s", arg, targetType.String())
+	return reflect.Value{}, false
 }
 
 func convertNumber(num json.Number, targetType reflect.Type) (reflect.Value, error) {
