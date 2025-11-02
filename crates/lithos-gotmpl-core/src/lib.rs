@@ -8,6 +8,73 @@ pub use lithos_gotmpl_engine::{
 use serde_json::Number;
 use serde_json::Value;
 
+struct ParsedSpecifier {
+    strategy: FormatStrategy,
+}
+
+impl ParsedSpecifier {
+    fn parse(chars: &mut std::str::Chars<'_>) -> Result<Self, Error> {
+        let Some(next) = chars.next() else {
+            return Err(Error::render("incomplete format specifier", None));
+        };
+
+        let strategy = match next {
+            '%' => FormatStrategy::PercentLiteral,
+            's' | 'v' => FormatStrategy::StringLike,
+            'd' | 'b' | 'o' | 'x' | 'X' => FormatStrategy::Integer,
+            'f' | 'g' | 'e' | 'E' => FormatStrategy::Float,
+            other => FormatStrategy::Fallback(other),
+        };
+
+        Ok(Self { strategy })
+    }
+
+    fn needs_argument(&self) -> bool {
+        !matches!(self.strategy, FormatStrategy::PercentLiteral)
+    }
+
+    fn format(&self, arg: Option<&Value>) -> Result<String, Error> {
+        match self.strategy {
+            FormatStrategy::PercentLiteral => Ok("%".to_string()),
+            FormatStrategy::StringLike => {
+                let value =
+                    arg.ok_or_else(|| Error::render("not enough arguments for printf", None))?;
+                Ok(value_to_string(value))
+            }
+            FormatStrategy::Integer => {
+                let value =
+                    arg.ok_or_else(|| Error::render("not enough arguments for printf", None))?;
+                format_integer(value)
+            }
+            FormatStrategy::Float => {
+                let value =
+                    arg.ok_or_else(|| Error::render("not enough arguments for printf", None))?;
+                format_float(value)
+            }
+            FormatStrategy::Fallback(specifier) => {
+                let value =
+                    arg.ok_or_else(|| Error::render("not enough arguments for printf", None))?;
+                let mut formatted = String::from("%");
+                formatted.push(specifier);
+                formatted.push_str(&value_to_string(value));
+                Ok(formatted)
+            }
+        }
+    }
+}
+
+enum FormatStrategy {
+    PercentLiteral,
+    StringLike,
+    Integer,
+    Float,
+    Fallback(char),
+}
+
+struct SliceIndices {
+    start: usize,
+    end: usize,
+}
 /// Builds a registry that mirrors the helper set Go's `text/template` exposes by
 /// default, keeping Lithos-compatible templates aligned with the reference
 /// implementation.
@@ -17,9 +84,7 @@ pub fn text_template_functions() -> FunctionRegistry {
     builder.build()
 }
 
-/// Adds the helpers shipped by Go's `text/template` to the provided registry
-/// builder so templates written against Go's defaults continue to behave as
-/// expected when rendered through Lithos.
+/// Installs the standard Go text/template helper functions into an existing registry builder.
 pub fn install_text_template_functions(builder: &mut FunctionRegistryBuilder) {
     builder
         .register("and", builtin_and)
@@ -113,7 +178,7 @@ fn builtin_printf(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error
         .ok_or_else(|| Error::render("printf expects format string as first argument", None))?;
 
     let mut output = String::new();
-    let mut chars = format.chars().peekable();
+    let mut chars = format.chars();
     let mut arg_index = 1usize;
 
     while let Some(ch) = chars.next() {
@@ -122,47 +187,33 @@ fn builtin_printf(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error
             continue;
         }
 
-        let Some(next) = chars.next() else {
-            return Err(Error::render("incomplete format specifier", None));
-        };
+        let specifier = ParsedSpecifier::parse(&mut chars)?;
 
-        if next == '%' {
-            output.push('%');
-            continue;
-        }
-
-        if arg_index >= args.len() {
-            return Err(Error::render("not enough arguments for printf", None));
-        }
-        let arg = &args[arg_index];
-        arg_index += 1;
-
-        let formatted = match next {
-            's' | 'v' => value_to_string(arg),
-            'd' | 'b' | 'o' | 'x' | 'X' => format_integer(arg)?,
-            'f' | 'g' | 'e' | 'E' => format_float(arg)?,
-            _ => {
-                let mut s = String::from("%");
-                s.push(next);
-                s.push_str(&value_to_string(arg));
-                s
-            }
-        };
-        output.push_str(&formatted);
-    }
-
-    if arg_index < args.len() {
-        let mut first_extra = true;
-        for extra in &args[arg_index..] {
-            if !first_extra {
-                output.push(' ');
-            }
-            first_extra = false;
-            output.push_str(&value_to_string(extra));
+        if specifier.needs_argument() {
+            let arg = args
+                .get(arg_index)
+                .ok_or_else(|| Error::render("not enough arguments for printf", None))?;
+            arg_index += 1;
+            output.push_str(&specifier.format(Some(arg))?);
+        } else {
+            output.push_str(&specifier.format(None)?);
         }
     }
+
+    append_extra_args(&mut output, &args[arg_index..]);
 
     Ok(Value::String(output))
+}
+
+fn append_extra_args(output: &mut String, extra_args: &[Value]) {
+    let mut extras = extra_args.iter();
+    if let Some(first) = extras.next() {
+        output.push_str(&value_to_string(first));
+        for arg in extras {
+            output.push(' ');
+            output.push_str(&value_to_string(arg));
+        }
+    }
 }
 
 fn builtin_print(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
@@ -338,7 +389,31 @@ fn builtin_slice(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error>
         return Err(Error::render("slice expects at least one argument", None));
     }
     let target = &args[0];
-    let indices: Result<Vec<usize>, Error> = args[1..]
+
+    match target {
+        Value::String(s) => {
+            let len = s.len();
+            let SliceIndices { start, end } = parse_slice_indices(&args[1..], len)?;
+            let slice = s
+                .get(start..end)
+                .ok_or_else(|| Error::render("slice indices not on char boundaries", None))?;
+            Ok(Value::String(slice.to_string()))
+        }
+        Value::Array(list) => {
+            let len = list.len();
+            let SliceIndices { start, end } = parse_slice_indices(&args[1..], len)?;
+            Ok(Value::Array(list[start..end].to_vec()))
+        }
+        Value::Null => Ok(Value::Array(Vec::new())),
+        _ => Err(Error::render(
+            "slice expects string or array as first argument",
+            None,
+        )),
+    }
+}
+
+fn parse_slice_indices(indices: &[Value], len: usize) -> Result<SliceIndices, Error> {
+    let parsed: Result<Vec<usize>, Error> = indices
         .iter()
         .map(|arg| {
             if let Some(idx) = arg.as_u64().or_else(|| {
@@ -357,31 +432,12 @@ fn builtin_slice(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error>
             }
         })
         .collect();
-    let indices = indices?;
-    if indices.len() > 2 {
+    let parsed = parsed?;
+    if parsed.len() > 2 {
         return Err(Error::render("slice supports at most two indices", None));
     }
-
-    match target {
-        Value::String(s) => {
-            let len = s.len();
-            let (start, end) = slice_bounds(&indices, len)?;
-            let slice = s
-                .get(start..end)
-                .ok_or_else(|| Error::render("slice indices not on char boundaries", None))?;
-            Ok(Value::String(slice.to_string()))
-        }
-        Value::Array(list) => {
-            let len = list.len();
-            let (start, end) = slice_bounds(&indices, len)?;
-            Ok(Value::Array(list[start..end].to_vec()))
-        }
-        Value::Null => Ok(Value::Array(Vec::new())),
-        _ => Err(Error::render(
-            "slice expects string or array as first argument",
-            None,
-        )),
-    }
+    let (start, end) = slice_bounds(&parsed, len)?;
+    Ok(SliceIndices { start, end })
 }
 
 fn slice_bounds(indices: &[usize], len: usize) -> Result<(usize, usize), Error> {
@@ -535,6 +591,57 @@ mod tests {
             .unwrap();
         let result = tmpl.render(&json!({ "word": "rustacean" })).unwrap();
         assert_eq!(result, "us");
+    }
+
+    #[test]
+    fn parsed_specifier_formats_percent_literal_without_argument() {
+        let mut chars = "%".chars();
+        let specifier = ParsedSpecifier::parse(&mut chars).unwrap();
+        assert!(!specifier.needs_argument());
+        assert_eq!(specifier.format(None).unwrap(), "%");
+    }
+
+    #[test]
+    fn parsed_specifier_uses_expected_strategy() {
+        let mut string_chars = "s".chars();
+        let string_spec = ParsedSpecifier::parse(&mut string_chars).unwrap();
+        assert!(string_spec.needs_argument());
+        assert_eq!(string_spec.format(Some(&json!("value"))).unwrap(), "value");
+
+        let mut int_chars = "d".chars();
+        let int_spec = ParsedSpecifier::parse(&mut int_chars).unwrap();
+        assert_eq!(int_spec.format(Some(&json!(42))).unwrap(), "42");
+
+        let mut float_chars = "f".chars();
+        let float_spec = ParsedSpecifier::parse(&mut float_chars).unwrap();
+        assert_eq!(float_spec.format(Some(&json!(2.5000))).unwrap(), "2.5");
+
+        let mut fallback_chars = "q".chars();
+        let fallback_spec = ParsedSpecifier::parse(&mut fallback_chars).unwrap();
+        assert_eq!(
+            fallback_spec.format(Some(&json!("fallback"))).unwrap(),
+            "%qfallback"
+        );
+    }
+
+    #[test]
+    fn parsed_specifier_requires_argument_when_missing() {
+        let mut chars = "s".chars();
+        let specifier = ParsedSpecifier::parse(&mut chars).unwrap();
+        assert!(specifier.format(None).is_err());
+    }
+
+    #[test]
+    fn parse_slice_indices_accepts_numeric_and_string_indices() {
+        let indices = vec![json!(1), json!("3")];
+        let SliceIndices { start, end } = parse_slice_indices(&indices, 10).unwrap();
+        assert_eq!((start, end), (1, 3));
+    }
+
+    #[test]
+    fn parse_slice_indices_rejects_negative_indices() {
+        let indices = vec![json!(-1)];
+        assert!(parse_slice_indices(&indices, 5).is_err());
     }
 
     #[test]
