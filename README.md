@@ -52,7 +52,7 @@ assert_eq!(rendered, "Friend");
 
 Extended guides live under [`docs/`](docs/README.md). Highlights include:
 
-- [Testing strategy](docs/testing-guidelines.md) – behavioural fixtures, the Go oracle, and when to add Rust-only assertions.
+- [Testing strategy](docs/guides/testing.md) – behavioural fixtures, the Go oracle, and when to add Rust-only assertions.
 - [Function coverage](docs/reference/function-coverage.md) – helper matrix covering Go built-ins and Sprig additions.
 - [Template syntax coverage](docs/reference/template-syntax-coverage.md) – grammar/introspection status exercised by the suites.
 - [Contributor workflow](docs/development/README.md) – environment setup, CI commands, and contributor expectations.

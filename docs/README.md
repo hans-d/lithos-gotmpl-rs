@@ -4,8 +4,16 @@ Use these guides and references while working on the project:
 
 ## Guides
 
-- [Testing strategy](testing-guidelines.md) – how to add or update behavioural fixtures, run the Go oracle, and decide when to write Rust-only tests.
+Guides live under `docs/guides/`.
+
+- [Testing strategy](guides/testing.md) – how to add or update behavioural fixtures, run the Go oracle, and decide when to write Rust-only tests.
+
+## Development
+
 - [Contributor workflow](development/README.md) – environment setup, Just recipes, and CI workflow notes.
+
+## Operations
+
 - [Releasing](operations/releasing.md) – preparing crate releases and running the supporting automation.
 
 ## References

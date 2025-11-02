@@ -25,7 +25,7 @@ express as black-box fixtures.
 - Keep fixtures concise: prefer one assertion per entry, reuse JSON `data` payloads, and move
   multi-step scenarios into their own directories so both the Go and Rust runners can reuse assets.
 - When you introduce new behaviours, update the relevant coverage documents (for example
-  `docs/function-coverage.md` or `docs/template-syntax-coverage.md`) so contributors can see which
+  `../reference/function-coverage.md` or `../reference/template-syntax-coverage.md`) so contributors can see which
   areas are implemented or still missing tests.
 
 ## Go oracle expectations
