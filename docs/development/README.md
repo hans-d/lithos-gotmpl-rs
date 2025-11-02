@@ -54,8 +54,4 @@ Individual installers exist (`just install-cargo-audit`, `just install-actionlin
 6. **Run checks**  
    Execute `just ci-test`, `just ci-behavior`, and `just ci-quality` before opening the PR. Depending on the helper, `just ci-security` may also be appropriate.
 
-### Missing coverage detection
-
-The `crates/lithos-sprig/tests/coverage.rs` suite enforces that every helper registered by `install_sprig_functions` appears in at least one fixture under `test-cases/`. If you add a helper without a corresponding fixture, this test fails with a list of missing function names—add a JSON or directory fixture before sending the PR.
-
 Questions on process or environment setup? Open an issue or consult `AGENT.md`.
