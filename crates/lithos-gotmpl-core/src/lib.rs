@@ -74,7 +74,6 @@ enum FormatStrategy {
 struct SliceIndices {
     start: usize,
     end: usize,
-    diagnostics: Vec<String>,
 }
 /// Builds a registry that mirrors the helper set Go's `text/template` exposes by
 /// default, keeping Lithos-compatible templates aligned with the reference
@@ -394,14 +393,7 @@ fn builtin_slice(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error>
     match target {
         Value::String(s) => {
             let len = s.len();
-            let SliceIndices {
-                start,
-                end,
-                diagnostics,
-            } = parse_slice_indices(&args[1..], len)?;
-            if !diagnostics.is_empty() {
-                return Err(Error::render(diagnostics.join("; "), None));
-            }
+            let SliceIndices { start, end } = parse_slice_indices(&args[1..], len)?;
             let slice = s
                 .get(start..end)
                 .ok_or_else(|| Error::render("slice indices not on char boundaries", None))?;
@@ -409,14 +401,7 @@ fn builtin_slice(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error>
         }
         Value::Array(list) => {
             let len = list.len();
-            let SliceIndices {
-                start,
-                end,
-                diagnostics,
-            } = parse_slice_indices(&args[1..], len)?;
-            if !diagnostics.is_empty() {
-                return Err(Error::render(diagnostics.join("; "), None));
-            }
+            let SliceIndices { start, end } = parse_slice_indices(&args[1..], len)?;
             Ok(Value::Array(list[start..end].to_vec()))
         }
         Value::Null => Ok(Value::Array(Vec::new())),
@@ -452,11 +437,7 @@ fn parse_slice_indices(indices: &[Value], len: usize) -> Result<SliceIndices, Er
         return Err(Error::render("slice supports at most two indices", None));
     }
     let (start, end) = slice_bounds(&parsed, len)?;
-    Ok(SliceIndices {
-        start,
-        end,
-        diagnostics: Vec::new(),
-    })
+    Ok(SliceIndices { start, end })
 }
 
 fn slice_bounds(indices: &[usize], len: usize) -> Result<(usize, usize), Error> {
@@ -653,13 +634,8 @@ mod tests {
     #[test]
     fn parse_slice_indices_accepts_numeric_and_string_indices() {
         let indices = vec![json!(1), json!("3")];
-        let SliceIndices {
-            start,
-            end,
-            diagnostics,
-        } = parse_slice_indices(&indices, 10).unwrap();
+        let SliceIndices { start, end } = parse_slice_indices(&indices, 10).unwrap();
         assert_eq!((start, end), (1, 3));
-        assert!(diagnostics.is_empty());
     }
 
     #[test]
