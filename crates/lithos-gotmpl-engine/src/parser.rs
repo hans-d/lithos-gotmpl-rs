@@ -167,10 +167,18 @@ pub fn parse_template(name: &str, source: &str) -> Result<Ast, Error> {
                     }
                 }
                 None => {
-                    return Err(Error::parse_with_span(
-                        "unclosed action",
-                        Span::new(open, source.len()),
-                    ));
+                    let mut remainder = &source[open + 2..];
+                    remainder = remainder.trim_start();
+                    if let Some(rest) = remainder.strip_prefix('-') {
+                        remainder = rest.trim_start();
+                    }
+
+                    let span = Span::new(open, source.len());
+                    if remainder.starts_with("/*") {
+                        return Err(Error::parse_with_span("unclosed comment", span));
+                    }
+
+                    return Err(Error::parse_with_span("unclosed action", span));
                 }
             }
         } else {
@@ -796,8 +804,20 @@ fn find_action_end(bytes: &[u8], from: usize) -> Option<usize> {
     let mut i = from;
     let mut in_raw = false;
     let mut in_string = false;
+    let mut in_comment = false;
     while i + 1 < bytes.len() {
         let current = bytes[i];
+
+        if in_comment {
+            if current == b'*' && bytes[i + 1] == b'/' {
+                in_comment = false;
+                i += 2;
+            } else {
+                i += 1;
+            }
+            continue;
+        }
+
         if in_raw {
             if current == b'`' {
                 in_raw = false;
@@ -805,6 +825,7 @@ fn find_action_end(bytes: &[u8], from: usize) -> Option<usize> {
             i += 1;
             continue;
         }
+
         if in_string {
             if current == b'\\' {
                 i += 2;
@@ -816,6 +837,13 @@ fn find_action_end(bytes: &[u8], from: usize) -> Option<usize> {
             i += 1;
             continue;
         }
+
+        if current == b'/' && bytes[i + 1] == b'*' {
+            in_comment = true;
+            i += 2;
+            continue;
+        }
+
         match current {
             b'`' => {
                 in_raw = true;
@@ -829,6 +857,7 @@ fn find_action_end(bytes: &[u8], from: usize) -> Option<usize> {
             }
             _ => {}
         }
+
         if current == b'}' && bytes[i + 1] == b'}' {
             return Some(i);
         }
