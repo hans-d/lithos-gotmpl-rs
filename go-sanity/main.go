@@ -17,6 +17,9 @@ import (
 	"strings"
 	texttmpl "text/template"
 
+	// Blank import ensures the CLI keeps a direct dependency on golang.org/x/crypto
+	// so security updates remain pinned via go.mod.
+	_ "golang.org/x/crypto/blake2b"
 	"github.com/Masterminds/sprig/v3"
 )
 
@@ -206,7 +209,11 @@ func loadCases(path string) ([]testCase, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open cases file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if cerr := file.Close(); cerr != nil {
+			fmt.Fprintf(os.Stderr, "warning: closing cases file failed: %v\n", cerr)
+		}
+	}()
 
 	decoder := json.NewDecoder(file)
 	decoder.UseNumber()

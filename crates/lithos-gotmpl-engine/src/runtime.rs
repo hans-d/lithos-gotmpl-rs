@@ -423,6 +423,99 @@ impl EvalContext {
     }
 }
 
+pub fn value_to_string(value: &Value) -> String {
+    match value {
+        Value::Null => String::new(),
+        Value::Bool(b) => b.to_string(),
+        Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                i.to_string()
+            } else if let Some(u) = n.as_u64() {
+                u.to_string()
+            } else {
+                let mut s = n.to_string();
+                if s.contains('.') {
+                    while s.ends_with('0') {
+                        s.pop();
+                    }
+                    if s.ends_with('.') {
+                        s.pop();
+                    }
+                }
+                s
+            }
+        }
+        Value::String(s) => s.clone(),
+        Value::Array(_) | Value::Object(_) => serde_json::to_string(value).unwrap_or_default(),
+    }
+}
+
+pub fn parse_number(text: &str) -> Option<Number> {
+    if !text.contains(['.', 'e', 'E']) {
+        if let Ok(value) = text.parse::<i64>() {
+            return Some(Number::from(value));
+        }
+        if let Ok(value) = text.parse::<u64>() {
+            return Some(Number::from(value));
+        }
+    }
+
+    text.parse::<f64>().ok().and_then(Number::from_f64)
+}
+
+pub fn is_empty(value: &Value) -> bool {
+    match value {
+        Value::Null => true,
+        Value::Bool(b) => !*b,
+        Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                i == 0
+            } else if let Some(u) = n.as_u64() {
+                u == 0
+            } else {
+                n.as_f64().map(|f| f == 0.0).unwrap_or(false)
+            }
+        }
+        Value::String(s) => s.is_empty(),
+        Value::Array(arr) => arr.iter().all(is_empty),
+        Value::Object(map) => map.is_empty(),
+    }
+}
+
+pub fn is_truthy(value: &Value) -> bool {
+    match value {
+        Value::Null => false,
+        Value::Bool(b) => *b,
+        Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                i != 0
+            } else if let Some(u) = n.as_u64() {
+                u != 0
+            } else {
+                n.as_f64().map(|f| f != 0.0).unwrap_or(false)
+            }
+        }
+        Value::String(s) => !s.is_empty(),
+        Value::Array(arr) => !arr.is_empty(),
+        Value::Object(map) => !map.is_empty(),
+    }
+}
+
+pub fn coerce_number(value: &Value) -> Result<f64, Error> {
+    if let Some(i) = value.as_i64() {
+        Ok(i as f64)
+    } else if let Some(u) = value.as_u64() {
+        Ok(u as f64)
+    } else if let Some(f) = value.as_f64() {
+        Ok(f)
+    } else if let Some(s) = value.as_str() {
+        s.parse::<f64>()
+            .map_err(|_| Error::render("cannot convert string to number", None))
+    } else {
+        Err(Error::render("expected numeric value for comparison", None))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -534,98 +627,5 @@ mod tests {
         assert!(err
             .to_string()
             .contains("cannot pipe value into non-function expression"));
-    }
-}
-
-pub fn value_to_string(value: &Value) -> String {
-    match value {
-        Value::Null => String::new(),
-        Value::Bool(b) => b.to_string(),
-        Value::Number(n) => {
-            if let Some(i) = n.as_i64() {
-                i.to_string()
-            } else if let Some(u) = n.as_u64() {
-                u.to_string()
-            } else {
-                let mut s = n.to_string();
-                if s.contains('.') {
-                    while s.ends_with('0') {
-                        s.pop();
-                    }
-                    if s.ends_with('.') {
-                        s.pop();
-                    }
-                }
-                s
-            }
-        }
-        Value::String(s) => s.clone(),
-        Value::Array(_) | Value::Object(_) => serde_json::to_string(value).unwrap_or_default(),
-    }
-}
-
-pub fn parse_number(text: &str) -> Option<Number> {
-    if !text.contains(['.', 'e', 'E']) {
-        if let Ok(value) = text.parse::<i64>() {
-            return Some(Number::from(value));
-        }
-        if let Ok(value) = text.parse::<u64>() {
-            return Some(Number::from(value));
-        }
-    }
-
-    text.parse::<f64>().ok().and_then(Number::from_f64)
-}
-
-pub fn is_empty(value: &Value) -> bool {
-    match value {
-        Value::Null => true,
-        Value::Bool(b) => !*b,
-        Value::Number(n) => {
-            if let Some(i) = n.as_i64() {
-                i == 0
-            } else if let Some(u) = n.as_u64() {
-                u == 0
-            } else {
-                n.as_f64().map(|f| f == 0.0).unwrap_or(false)
-            }
-        }
-        Value::String(s) => s.is_empty(),
-        Value::Array(arr) => arr.iter().all(is_empty),
-        Value::Object(map) => map.is_empty(),
-    }
-}
-
-pub fn is_truthy(value: &Value) -> bool {
-    match value {
-        Value::Null => false,
-        Value::Bool(b) => *b,
-        Value::Number(n) => {
-            if let Some(i) = n.as_i64() {
-                i != 0
-            } else if let Some(u) = n.as_u64() {
-                u != 0
-            } else {
-                n.as_f64().map(|f| f != 0.0).unwrap_or(false)
-            }
-        }
-        Value::String(s) => !s.is_empty(),
-        Value::Array(arr) => !arr.is_empty(),
-        Value::Object(map) => !map.is_empty(),
-    }
-}
-
-pub fn coerce_number(value: &Value) -> Result<f64, Error> {
-    if let Some(i) = value.as_i64() {
-        Ok(i as f64)
-    } else if let Some(u) = value.as_u64() {
-        Ok(u as f64)
-    } else if let Some(f) = value.as_f64() {
-        Ok(f)
-    } else if let Some(s) = value.as_str() {
-        s.parse::<f64>()
-            .map_err(|_| Error::render("cannot convert string to number", None))
-    } else {
-        Err(Error::render("expected numeric value for comparison", None))
     }
 }

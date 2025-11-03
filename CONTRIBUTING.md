@@ -1,7 +1,18 @@
 # Contributing Guide
 
-Thanks for your interest in improving this project! This document outlines how to set up a
-development environment, run the test suite, and prepare changes for review.
+Thanks for your interest in improving this project! This document outlines:
+
+- Where to ask questions or report problems.
+- How to set up a development environment and run the test suite.
+- What we currently expect from contributions (including open items we still need to formalise).
+
+For a security-focused status snapshot, see `docs/security/threat-model.md`.
+
+## Getting help, reporting bugs, requesting features
+
+- **Issues & feature requests:** use the [GitHub issue tracker](https://github.com/hans-d/lithos-gotmpl-rs/issues). Please search first to avoid duplicates. For general feedback, open an issue under the `feedback` label so we can track follow-up work.
+- **Security reports:** see the guidance in `SECURITY.md`. FUTURE: define a private reporting channel once additional maintainers join.
+- **Discussions:** we use issues/PRs for all proposals so that the history stays searchable without proprietary tooling.
 
 ## Getting Started
 
@@ -55,15 +66,23 @@ Before submitting a pull request:
 2. `just ci-quality`
 3. Other checks as relevant to your change (e.g. `ci-behavior` when adding Sprig helpers).
 
-## Coding Standards
+## Contribution expectations & open decisions
 
-- Rust code is formatted with `cargo fmt` and linted with `cargo clippy` (warnings are treated as
-  issues in CI).
-- Public APIs should carry concise rustdoc comments.
-- If you add a new helper or template feature, mirror it in `test-cases/` and extend the Go oracle
-  fixtures when possible.
-- Keep `docs/reference/function-coverage.md` and `docs/reference/template-syntax-coverage.md` in sync with new
-  capabilities.
+The project is still evolving its formal policies. The table below captures the **current
+expectations** as well as items we still need to define (marked FUTURE).
+
+| Topic | Current expectation | FUTURE work |
+| --- | --- | --- |
+| **Code style** | Rust: `cargo fmt` + `cargo clippy` must pass. Go oracle: keep files `go fmt`-clean and ensure `go test ./...` succeeds. | Document explicit style guide references (e.g., Rust API docs conventions). |
+| **Static analysis** | CI runs `cargo geiger` (Rust) and `golangci-lint` (Go). If you touch those areas, run the same commands locally before pushing. | Define how to suppress/triage findings once multiple maintainers share review duties. |
+| **Tests** | Add or update fixtures under `test-cases/` and/or Rust unit tests for behaviour changes. Run `just ci-test` and `just ci-quality` before opening a PR. | Capture a written “tests must accompany major functionality changes” policy in this guide and in PR template. |
+| **Documentation** | Update README/docs when user-visible behaviour changes. Keep coverage docs in sync. | Draft a contributor-focused checklist for doc updates, including security/architecture notes. |
+| **Release notes** | Release automation is minimal today; mention notable changes in PR descriptions. | Define a release note process (e.g., changelog aggregation) before the next tagged release. |
+| **Branch protection / reviews** | Single maintainer currently; Scorecard branch-protection check disabled (see workflows). | Reinstate branch protection and two-person reviews once a second maintainer joins. |
+| **Security reporting** | Follow `SECURITY.md`; currently references FUTURE private channel. | Establish private intake channel and response SLA. |
+
+Please add TODOs or notes in the relevant files when you touch areas marked FUTURE—the intent is to
+make it clear what remains to be decided.
 
 ## Fuzzing & Mutation Testing
 
@@ -78,7 +97,7 @@ Before submitting a pull request:
 
 1. Fork the repository and create a feature branch.
 2. Make your changes, update documentation/tests as needed.
-3. Ensure the relevant `just ci-*` commands pass.
+3. Ensure the relevant `just ci-*` commands pass (see the expectations table above).
 4. Open a pull request describing the motivation, testing performed, and any follow-up work.
 
 We appreciate your contributions!
