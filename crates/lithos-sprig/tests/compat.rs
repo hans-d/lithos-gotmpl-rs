@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
+use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -28,6 +29,17 @@ struct GoSanityCase {
     error: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+struct TemplateFixture {
+    name: String,
+    #[serde(default)]
+    expected: Option<String>,
+    #[serde(default)]
+    error: Option<String>,
+    #[serde(default)]
+    skip_go: bool,
+}
+
 #[test]
 fn go_sanity_matches_sprig_examples() {
     if Command::new("go").arg("version").output().is_err() {
@@ -42,7 +54,7 @@ fn go_sanity_matches_sprig_examples() {
         .parent()
         .expect("missing workspace root");
     let runner_dir = workspace_root.join("go-sanity");
-    let cases_path = manifest_dir
+    let sprig_cases_path = manifest_dir
         .parent()
         .expect("missing crates directory")
         .parent()
@@ -51,15 +63,7 @@ fn go_sanity_matches_sprig_examples() {
     let go_cache = workspace_root.join("target/go-cache");
     let _ = fs::create_dir_all(&go_cache);
 
-    let output = Command::new("go")
-        .arg("run")
-        .arg(".")
-        .arg("-cases")
-        .arg(&cases_path)
-        .current_dir(&runner_dir)
-        .env("GOCACHE", &go_cache)
-        .output()
-        .expect("failed to invoke go-sanity runner");
+    let output = run_go_sanity(&runner_dir, &go_cache, &sprig_cases_path, true);
 
     assert!(
         output.status.success(),
@@ -150,6 +154,32 @@ fn go_sanity_matches_sprig_examples() {
     }
 
     verify_directory_cases(&registry, runner_dir.as_path(), workspace_root, &go_cache);
+
+    let core_cases_path = workspace_root.join("test-cases/lithos-gotmpl-core.json");
+    verify_template_case_file(&runner_dir, &go_cache, &core_cases_path);
+
+    let engine_cases_path = workspace_root.join("test-cases/lithos-gotmpl-engine.json");
+    verify_template_case_file(&runner_dir, &go_cache, &engine_cases_path);
+}
+
+fn run_go_sanity(
+    runner_dir: &Path,
+    go_cache: &Path,
+    cases_path: &Path,
+    include_sprig: bool,
+) -> std::process::Output {
+    let mut command = Command::new("go");
+    command.arg("run").arg(".").arg("-cases").arg(cases_path);
+
+    if !include_sprig {
+        command.arg("-sprig=false");
+    }
+
+    command
+        .current_dir(runner_dir)
+        .env("GOCACHE", go_cache)
+        .output()
+        .expect("failed to invoke go-sanity runner")
 }
 
 fn verify_directory_cases(
@@ -212,15 +242,7 @@ fn verify_directory_cases(
         serde_json::to_writer(&mut temp, &case_json).expect("write temp test case");
         temp.flush().expect("flush temp test case");
 
-        let output = Command::new("go")
-            .arg("run")
-            .arg(".")
-            .arg("-cases")
-            .arg(temp.path())
-            .current_dir(runner_dir)
-            .env("GOCACHE", go_cache)
-            .output()
-            .expect("failed to invoke go-sanity runner for directory case");
+        let output = run_go_sanity(runner_dir, go_cache, temp.path(), true);
 
         assert!(
             output.status.success(),
@@ -245,6 +267,91 @@ fn verify_directory_cases(
         } else {
             panic!("go-sanity did not return rendered output for {}", name);
         }
+    }
+}
+
+fn verify_template_case_file(runner_dir: &Path, go_cache: &Path, cases_path: &Path) {
+    if !cases_path.exists() {
+        panic!("template case file {} does not exist", cases_path.display());
+    }
+
+    let go_output = run_go_sanity(runner_dir, go_cache, cases_path, false);
+
+    assert!(
+        go_output.status.success(),
+        "go-sanity execution failed for {}: {}\nstdout: {}\nstderr: {}",
+        cases_path.display(),
+        go_output.status,
+        String::from_utf8_lossy(&go_output.stdout),
+        String::from_utf8_lossy(&go_output.stderr)
+    );
+
+    let go_cases: Vec<GoSanityCase> =
+        serde_json::from_slice(&go_output.stdout).expect("failed to parse go-sanity output");
+
+    let mut go_cases_by_name: HashMap<String, GoSanityCase> = HashMap::new();
+    for case in go_cases {
+        let key = case
+            .name
+            .clone()
+            .or_else(|| case.function.clone())
+            .unwrap_or_else(|| "<anonymous>".to_string());
+
+        if go_cases_by_name.insert(key.clone(), case).is_some() {
+            panic!("duplicate go-sanity case returned for {key}");
+        }
+    }
+
+    let bytes = fs::read(cases_path)
+        .unwrap_or_else(|err| panic!("failed to read {}: {err}", cases_path.display()));
+    let fixtures: Vec<TemplateFixture> = serde_json::from_slice(&bytes)
+        .unwrap_or_else(|err| panic!("invalid JSON in {}: {err}", cases_path.display()));
+
+    for fixture in fixtures {
+        let name = fixture.name;
+        let go_case = go_cases_by_name
+            .remove(&name)
+            .unwrap_or_else(|| panic!("go-sanity did not return case {name}"));
+
+        if fixture.skip_go {
+            continue;
+        }
+
+        match fixture.error.as_ref() {
+            Some(expected_err) => {
+                let go_err = go_case
+                    .error
+                    .unwrap_or_else(|| panic!("{name}: expected go to report an error"));
+                assert!(
+                    go_err.contains(expected_err),
+                    "{name}: go error '{}' did not include expected substring '{}'",
+                    go_err,
+                    expected_err
+                );
+            }
+            None => {
+                if let Some(err) = go_case.error {
+                    panic!("{name}: go reported unexpected error: {err}");
+                }
+
+                let expected = fixture.expected.as_deref().unwrap_or("");
+                let rendered = go_case
+                    .rendered
+                    .as_ref()
+                    .unwrap_or_else(|| panic!("{name}: go did not render output"));
+
+                assert_eq!(rendered, expected, "{name}: go rendered mismatch");
+            }
+        }
+    }
+
+    if !go_cases_by_name.is_empty() {
+        let remaining: Vec<String> = go_cases_by_name.keys().cloned().collect();
+        panic!(
+            "go-sanity returned additional cases not present in {}: {:?}",
+            cases_path.display(),
+            remaining
+        );
     }
 }
 
