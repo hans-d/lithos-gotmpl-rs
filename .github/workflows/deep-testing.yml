@@ -13,6 +13,9 @@ defaults:
   run:
     shell: bash
 
+env:
+  JUST_VERSION: "1.36.0"
+
 # yamllint disable-line rule:truthy
 on:
   schedule:
@@ -98,9 +101,43 @@ jobs:
 
       - name: Install just & cargo-mutants
         run: |
+          set -euo pipefail
           if ! command -v just >/dev/null 2>&1; then
-            curl -LsSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+            arch="${RUNNER_ARCH:-$(uname -m)}"
+            case "${arch}" in
+              X64|x86_64|amd64) just_arch="x86_64" ;;
+              ARM64|arm64|aarch64) just_arch="aarch64" ;;
+              *)
+                echo "Unsupported architecture: ${arch}" >&2
+                exit 1
+                ;;
+            esac
+
+            case "${RUNNER_OS}" in
+              Linux)
+                just_platform="unknown-linux-musl"
+                archive_ext="tar.gz"
+                ;;
+              macOS)
+                just_platform="apple-darwin"
+                archive_ext="tar.gz"
+                ;;
+              *)
+                echo "Unsupported runner OS: ${RUNNER_OS}" >&2
+                exit 1
+                ;;
+            esac
+
+            archive="just-${JUST_VERSION}-${just_arch}-${just_platform}.${archive_ext}"
+            url="https://github.com/casey/just/releases/download/${JUST_VERSION}/${archive}"
+            tmpdir="$(mktemp -d)"
+            trap 'rm -rf "${tmpdir}"' EXIT
+            curl --fail --location --show-error --retry 5 --retry-delay 2 "${url}" -o "${tmpdir}/${archive}"
+            tar -xzf "${tmpdir}/${archive}" -C "${tmpdir}"
+            mkdir -p "${HOME}/.local/bin"
+            install -m 0755 "${tmpdir}/just" "${HOME}/.local/bin/just"
           fi
+          echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
           if ! command -v cargo-mutants >/dev/null 2>&1; then
             cargo install --locked cargo-mutants
           fi
