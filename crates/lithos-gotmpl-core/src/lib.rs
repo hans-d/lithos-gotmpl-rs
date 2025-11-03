@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 pub use lithos_gotmpl_engine::{
     analyze_template, coerce_number, is_empty, is_truthy, value_to_string, AnalysisIssue,
@@ -7,6 +8,11 @@ pub use lithos_gotmpl_engine::{
 };
 use serde_json::Number;
 use serde_json::Value;
+
+struct SliceIndices {
+    start: usize,
+    end: usize,
+}
 
 struct ParsedSpecifier {
     strategy: FormatStrategy,
@@ -71,10 +77,6 @@ enum FormatStrategy {
     Fallback(char),
 }
 
-struct SliceIndices {
-    start: usize,
-    end: usize,
-}
 /// Builds a registry that mirrors the helper set Go's `text/template` exposes by
 /// default, keeping Lithos-compatible templates aligned with the reference
 /// implementation.

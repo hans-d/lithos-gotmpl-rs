@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 //! Lithos Sprig provides a partial re-implementation of selected helpers from
 //! the `sprig` Go template library, tailored for use with Rust-based Go template

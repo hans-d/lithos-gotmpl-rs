@@ -20,10 +20,14 @@ ci-behavior:
         echo "Skipping behavior_contracts (no tests found)"; \
     fi
 
-ci-quality: ensure-yamllint
+ci-quality: ensure-yamllint ensure-cargo-geiger ensure-golangci-lint
     export PATH="$(go env GOPATH)/bin:$HOME/.local/bin:$PATH"
     cargo fmt --all -- --check
     cargo clippy --workspace --all-targets --all-features
+    GEIGER_NO_COLOR=1 cargo geiger --manifest-path "$(pwd)/crates/lithos-gotmpl-engine/Cargo.toml" --lib --forbid-only --output-format GitHubMarkdown
+    GEIGER_NO_COLOR=1 cargo geiger --manifest-path "$(pwd)/crates/lithos-gotmpl-core/Cargo.toml" --lib --forbid-only --output-format GitHubMarkdown
+    GEIGER_NO_COLOR=1 cargo geiger --manifest-path "$(pwd)/crates/lithos-sprig/Cargo.toml" --lib --forbid-only --output-format GitHubMarkdown
+    (cd {{go_sanity_dir}} && golangci-lint run ./...)
     if command -v actionlint >/dev/null 2>&1; then \
         actionlint; \
     elif [ -x "$(go env GOPATH)/bin/actionlint" ]; then \
@@ -53,6 +57,11 @@ ci-legal-full: ensure-cargo-deny ensure-cargo-about ensure-go-licenses
     (cd go-sanity && GOCACHE="$(pwd)/../target/go-cache" go-licenses save ./... --save_path ../target/legal/go-licenses --force)
     python3 scripts/check_licenses.py
     python3 scripts/check_notice.py
+
+ci-osv: ensure-osv-scanner
+    mkdir -p target
+    osv-scanner --recursive --output=target/osv-report.json .
+    @echo "OSV report written to target/osv-report.json"
 
 ci-dependencies:
     just ci-security
@@ -99,13 +108,13 @@ install-ci-tools: install-cargo-audit install-cargo-deny install-cargo-about ins
     @echo "Installed core CI tools"
 
 ensure-syft:
-    if ! command -v syft >/dev/null 2>&1; then \
+    @if ! command -v syft >/dev/null 2>&1; then \
         echo "syft not installed. Install it from https://github.com/anchore/syft#installation." >&2; \
         exit 1; \
     fi
 
 ensure-scancode:
-    if ! command -v scancode >/dev/null 2>&1; then \
+    @if ! command -v scancode >/dev/null 2>&1; then \
         echo "scancode not installed. See https://scancode-toolkit.readthedocs.io/en/latest/getting-started/install.html" >&2; \
         exit 1; \
     fi
@@ -166,49 +175,69 @@ ensure-cargo-audit:
     fi
 
 ensure-cargo-deny:
-    if ! command -v cargo-deny >/dev/null 2>&1; then \
+    @if ! command -v cargo-deny >/dev/null 2>&1; then \
         echo "cargo-deny not installed. Run \`just install-cargo-deny\` or \`cargo install --locked cargo-deny\`." >&2; \
         exit 1; \
     fi
 
 ensure-cargo-about:
-    if ! command -v cargo-about >/dev/null 2>&1; then \
+    @if ! command -v cargo-about >/dev/null 2>&1; then \
         echo "cargo-about not installed. Run \`just install-cargo-about\` or \`cargo install --locked cargo-about\`." >&2; \
         exit 1; \
     fi
 
 ensure-go-licenses:
-    if ! command -v go-licenses >/dev/null 2>&1; then \
+    @if ! command -v go-licenses >/dev/null 2>&1; then \
         echo "go-licenses not installed. Run \`just install-go-licenses\` or \`go install github.com/google/go-licenses/v2@latest\`." >&2; \
         exit 1; \
     fi
 
 ensure-cargo-tarpaulin:
-    if ! command -v cargo-tarpaulin >/dev/null 2>&1; then \
+    @if ! command -v cargo-tarpaulin >/dev/null 2>&1; then \
         echo "cargo-tarpaulin not installed. Run \`just install-cargo-tarpaulin\` or \`cargo install --locked cargo-tarpaulin\`." >&2; \
         exit 1; \
     fi
 
 ensure-cargo-mutants:
-    if ! command -v cargo-mutants >/dev/null 2>&1; then \
+    @if ! command -v cargo-mutants >/dev/null 2>&1; then \
         echo "cargo-mutants not installed. Run \`just install-cargo-mutants\` or \`cargo install --locked cargo-mutants\`." >&2; \
         exit 1; \
     fi
 
 ensure-cargo-fuzz:
-    if ! command -v cargo-fuzz >/dev/null 2>&1; then \
+    @if ! command -v cargo-fuzz >/dev/null 2>&1; then \
         echo "cargo-fuzz not installed. Run \`just install-cargo-fuzz\` or \`cargo install cargo-fuzz\`." >&2; \
         exit 1; \
     fi
 
 ensure-yamllint:
-    if ! command -v yamllint >/dev/null 2>&1; then \
+    @if ! command -v yamllint >/dev/null 2>&1; then \
         echo "yamllint not installed. Run \`just install-yamllint\` or \`pip install --user yamllint\`." >&2; \
         exit 1; \
     fi
 
+ensure-cargo-geiger:
+    @if ! command -v cargo-geiger >/dev/null 2>&1; then \
+        echo "cargo-geiger not installed. Run \`cargo install --locked cargo-geiger\`." >&2; \
+        exit 1; \
+    fi
+
+ensure-golangci-lint:
+    @if ! command -v golangci-lint >/dev/null 2>&1; then \
+        echo "golangci-lint not installed. Install via https://golangci-lint.run/usage/install/ (e.g. `curl -sSfL https://raw.githubusercontent.com/golangci-lint/master/install.sh | sh -s -- -b "$(go env GOPATH)/bin" v1.59.1`)." >&2; \
+        exit 1; \
+    fi
+
+ensure-osv-scanner:
+    @if ! command -v osv-scanner >/dev/null 2>&1; then \
+        echo "osv-scanner not installed. Install via `go install github.com/google/osv-scanner/cmd/osv-scanner@latest`." >&2; \
+        exit 1; \
+    fi
+
+
+
 ensure-release-plz:
-    if ! command -v release-plz >/dev/null 2>&1; then \
+    @if ! command -v release-plz >/dev/null 2>&1; then \
         echo "release-plz not installed. Run `just install-release-plz` or `cargo install release-plz`." >&2; \
         exit 1; \
     fi

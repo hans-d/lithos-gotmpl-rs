@@ -177,6 +177,17 @@ jobs:
           cache: true
           check-latest: true
           cache-dependency-path: go-sanity/go.sum
+      - name: Install golangci-lint
+        env:
+          GOBIN: ${{ runner.temp }}/bin
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
+            | sh -s -- -b "${GOBIN}" v1.59.1
+          echo "${GOBIN}" >> "$GITHUB_PATH"
+      - name: Run golangci-lint
+        run: |
+          cd go-sanity
+          golangci-lint run ./...
       - name: Install just
         run: |
           set -euo pipefail
@@ -245,10 +256,29 @@ jobs:
       - name: Cache Rust tooling
         # yamllint disable-line rule:comments
         uses: step-security/rust-cache@f8fba7098297c8c53a7c9a30575ec2ad4ad85056 # v2.8.2
+      - name: Install cargo-geiger
+        run: |
+          if ! command -v cargo-geiger >/dev/null 2>&1; then
+            cargo install --locked cargo-geiger
+          fi
       - name: Format check
         run: cargo fmt --all -- --check
       - name: Clippy
         run: cargo clippy --workspace --all-targets --all-features
+      - name: Cargo geiger
+        env:
+          GEIGER_NO_COLOR: "1"
+          WORKSPACE_ROOT: ${{ github.workspace }}
+        run: |
+          cargo geiger \
+            --manifest-path "${WORKSPACE_ROOT}/crates/lithos-gotmpl-engine/Cargo.toml" \
+            --lib --forbid-only --output-format GitHubMarkdown
+          cargo geiger \
+            --manifest-path "${WORKSPACE_ROOT}/crates/lithos-gotmpl-core/Cargo.toml" \
+            --lib --forbid-only --output-format GitHubMarkdown
+          cargo geiger \
+            --manifest-path "${WORKSPACE_ROOT}/crates/lithos-sprig/Cargo.toml" \
+            --lib --forbid-only --output-format GitHubMarkdown
 
   lint:
     name: Workflow Linters
