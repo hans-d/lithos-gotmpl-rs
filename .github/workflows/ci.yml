@@ -177,6 +177,10 @@ jobs:
           cache: true
           check-latest: true
           cache-dependency-path: go-sanity/go.sum
+      - name: Download go-sanity modules
+        run: |
+          cd go-sanity
+          go mod download
       - name: Install golangci-lint
         env:
           GOBIN: ${{ runner.temp }}/bin
