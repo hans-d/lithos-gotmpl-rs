@@ -277,7 +277,12 @@ pub fn repeat(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
 }
 
 pub fn cat(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
-    Ok(Value::String(render_non_null(args, |s| s.to_string())))
+    let parts: Vec<String> = args
+        .iter()
+        .filter(|value| !value.is_null())
+        .map(|value| value_to_string(value))
+        .collect();
+    Ok(Value::String(parts.join(" ")))
 }
 
 pub fn quote(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
