@@ -45,6 +45,66 @@ type result struct {
 	Error    string        `json:"error,omitempty"`
 }
 
+func wrapExtremumFunctions(funcs map[string]interface{}) {
+	wrapIntExtremum(funcs, "min")
+	wrapIntExtremum(funcs, "max")
+	wrapFloatExtremum(funcs, "minf")
+	wrapFloatExtremum(funcs, "maxf")
+}
+
+func wrapIntExtremum(funcs map[string]interface{}, name string) {
+	original, ok := funcs[name].(func(interface{}, ...interface{}) int64)
+	if !ok {
+		return
+	}
+	funcs[name] = func(first interface{}, rest ...interface{}) int64 {
+		flattened := flattenExtremumArgs(append([]interface{}{first}, rest...))
+		if len(flattened) == 0 {
+			return original(first, rest...)
+		}
+		return original(flattened[0], flattened[1:]...)
+	}
+}
+
+func wrapFloatExtremum(funcs map[string]interface{}, name string) {
+	original, ok := funcs[name].(func(interface{}, ...interface{}) float64)
+	if !ok {
+		return
+	}
+	funcs[name] = func(first interface{}, rest ...interface{}) float64 {
+		flattened := flattenExtremumArgs(append([]interface{}{first}, rest...))
+		if len(flattened) == 0 {
+			return original(first, rest...)
+		}
+		return original(flattened[0], flattened[1:]...)
+	}
+}
+
+func flattenExtremumArgs(args []interface{}) []interface{} {
+	flattened := make([]interface{}, 0, len(args))
+	for _, arg := range args {
+		if arg == nil {
+			flattened = append(flattened, arg)
+			continue
+		}
+		val := reflect.ValueOf(arg)
+		switch val.Kind() {
+		case reflect.Slice, reflect.Array:
+			// Treat byte slices as atomic values.
+			if val.Type().Elem().Kind() == reflect.Uint8 {
+				flattened = append(flattened, arg)
+				continue
+			}
+			for i := 0; i < val.Len(); i++ {
+				flattened = append(flattened, val.Index(i).Interface())
+			}
+		default:
+			flattened = append(flattened, arg)
+		}
+	}
+	return flattened
+}
+
 func main() {
 	defaultCases := filepath.Join("..", "test-cases", "lithos-sprig.json")
 	casesPath := flag.String("cases", defaultCases, "path to JSON file with function cases")
@@ -62,14 +122,14 @@ func run(output io.Writer, casesPath string, includeSprig bool) error {
 		return err
 	}
 
-	var funcs map[string]interface{}
-	if includeSprig {
-		funcs = sprig.GenericFuncMap()
-		funcs["splitn"] = func(sep, text string, n int) []string {
-			return strings.SplitN(text, sep, n)
-		}
-	}
-
+    var funcs map[string]interface{}
+    if includeSprig {
+        funcs = sprig.GenericFuncMap()
+        wrapExtremumFunctions(funcs)
+        funcs["splitn"] = func(sep, text string, n int) []string {
+            return strings.SplitN(text, sep, n)
+        }
+    }
 	results := make([]result, 0, len(cases))
 	for _, c := range cases {
 		res, errs := evaluateCase(funcs, includeSprig, c)
