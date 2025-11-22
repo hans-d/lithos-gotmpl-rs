@@ -47,7 +47,7 @@ jobs:
           egress-policy: audit
       - name: Checkout repository
         # yamllint disable-line rule:comments
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - name: Compute path filters
         id: filter
         # yamllint disable-line rule:comments
@@ -93,7 +93,7 @@ jobs:
           egress-policy: audit
       - name: Checkout repository
         # yamllint disable-line rule:comments
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - name: Set up Rust
         # yamllint disable-line rule:comments
         uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
@@ -160,7 +160,7 @@ jobs:
           egress-policy: audit
       - name: Checkout repository
         # yamllint disable-line rule:comments
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - name: Set up Rust
         # yamllint disable-line rule:comments
         uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
@@ -171,7 +171,7 @@ jobs:
         uses: step-security/rust-cache@f8fba7098297c8c53a7c9a30575ec2ad4ad85056 # v2.8.2
       - name: Set up Go
         # yamllint disable-line rule:comments
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
         with:
           go-version-file: go-sanity/go.mod
           cache: true
@@ -235,7 +235,7 @@ jobs:
           egress-policy: audit
       - name: Checkout repository
         # yamllint disable-line rule:comments
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - name: Set up Rust
         # yamllint disable-line rule:comments
         uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
@@ -264,10 +264,10 @@ jobs:
           egress-policy: audit
       - name: Checkout repository
         # yamllint disable-line rule:comments
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - name: Set up Go
         # yamllint disable-line rule:comments
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
         with:
           go-version-file: go-sanity/go.mod
           cache: true
@@ -305,7 +305,7 @@ jobs:
           egress-policy: audit
       - name: Checkout repository
         # yamllint disable-line rule:comments
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - name: Set up Rust
         # yamllint disable-line rule:comments
         uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
@@ -341,10 +341,10 @@ jobs:
           egress-policy: audit
       - name: Checkout repository
         # yamllint disable-line rule:comments
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - name: Set up Go
         # yamllint disable-line rule:comments
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
         with:
           go-version-file: go-sanity/go.mod
           cache: true
@@ -382,7 +382,7 @@ jobs:
           egress-policy: audit
       - name: Checkout repository
         # yamllint disable-line rule:comments
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - name: Dependency review
         if: github.event_name == 'pull_request'
         # yamllint disable-line rule:comments
@@ -400,7 +400,7 @@ jobs:
       - name: Set up Go (non-PR)
         if: github.event_name != 'pull_request'
         # yamllint disable-line rule:comments
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
         with:
           go-version-file: go-sanity/go.mod
           cache: true
