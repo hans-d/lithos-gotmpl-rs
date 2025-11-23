@@ -85,6 +85,7 @@ Grouped following the upstream Sprig documentation.
 | `uniq` | Deduplicate while preserving order | ✅ |
 | `without` | Remove specified values | ✅ |
 | `has` | Test membership | ✅ |
+| `max` / `min` | Return the largest or smallest numeric value | ✅ |
 
 ### Maps
 

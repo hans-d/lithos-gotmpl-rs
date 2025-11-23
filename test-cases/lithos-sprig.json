@@ -617,6 +617,28 @@
     "expected": "true"
   },
   {
+    "name": "max-variadic",
+    "function": "max",
+    "args": [
+      1,
+      5,
+      3
+    ],
+    "output": 5
+  },
+  {
+    "name": "min-array",
+    "function": "min",
+    "args": [
+      [
+        4,
+        2,
+        9
+      ]
+    ],
+    "output": 2
+  },
+  {
     "name": "musttojson-object",
     "function": "mustToJson",
     "args": [

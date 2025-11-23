@@ -169,6 +169,7 @@ pub struct IfNode {
     pub tokens: Vec<crate::lexer::Token>,
     pub pipeline: Pipeline,
     pub then_block: Block,
+    pub else_if_branches: Vec<ElseIfBranch>,
     pub else_block: Option<Block>,
 }
 
@@ -178,6 +179,7 @@ impl IfNode {
         tokens: Vec<crate::lexer::Token>,
         pipeline: Pipeline,
         then_block: Block,
+        else_if_branches: Vec<ElseIfBranch>,
         else_block: Option<Block>,
     ) -> Self {
         Self {
@@ -185,7 +187,33 @@ impl IfNode {
             tokens,
             pipeline,
             then_block,
+            else_if_branches,
             else_block,
+        }
+    }
+}
+
+/// Captures an `{{else if ...}}` branch.
+#[derive(Debug, Clone)]
+pub struct ElseIfBranch {
+    pub span: Span,
+    pub tokens: Vec<crate::lexer::Token>,
+    pub pipeline: Pipeline,
+    pub block: Block,
+}
+
+impl ElseIfBranch {
+    pub fn new(
+        span: Span,
+        tokens: Vec<crate::lexer::Token>,
+        pipeline: Pipeline,
+        block: Block,
+    ) -> Self {
+        Self {
+            span,
+            tokens,
+            pipeline,
+            block,
         }
     }
 }

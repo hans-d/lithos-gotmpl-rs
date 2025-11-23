@@ -9,7 +9,7 @@ Rust-native helpers for working with Go-style templates without cgo. The workspa
 ## Highlights
 
 - Go-compatible pipelines, whitespace trims, control structures, and raw strings.
-- Pluggable helper registry with deterministic rendering and template analysis tooling.
+- Pluggable helper registry with deterministic rendering and `Template::analyze()` insights.
 - Sprig parity backed by shared fixtures and a Go-driven sanity harness.
 - Dual MIT/Apache licensing with compliance docs and CI guardrails out of the box.
 
@@ -50,7 +50,7 @@ assert_eq!(rendered, "Friend");
 
 ## Documentation
 
-Extended guides live under [`docs/`](docs/index.md). Highlights include:
+Start at [`docs/index.md`](docs/index.md) for the curated navigation. Frequently used references:
 
 - [Testing strategy](docs/guides/testing.md) – behavioural fixtures, the Go oracle, and when to add Rust-only assertions.
 - [Function coverage](docs/reference/function-coverage.md) – helper matrix covering Go built-ins and Sprig additions.
@@ -60,8 +60,7 @@ Extended guides live under [`docs/`](docs/index.md). Highlights include:
 - `docs/legal/` – licence compliance notes and generated reports.
 
 ## Compatibility & Caveats
-
-- Behaviour targets the constructs required by downstream Hydros/Lithos tooling; some `text/template` features (`else if`, `define`, dynamic template inclusion) remain unimplemented. Track progress in [`docs/reference/template-syntax-coverage.md`](docs/reference/template-syntax-coverage.md).
+- Behaviour targets the constructs required by downstream Hydros/Lithos tooling; some `text/template` features (`define`, dynamic template inclusion) remain unimplemented. Track progress in [`docs/reference/template-syntax-coverage.md`](docs/reference/template-syntax-coverage.md).
 - Deterministic map helpers (`keys`, `values`) intentionally diverge from Go’s random iteration order.
 - The Go-based `go-sanity` runner is a development aid that mirrors upstream Sprig; install Go 1.25.1+ to enable the compat test suite.
 
@@ -71,5 +70,4 @@ Consult [`SUPPORT.md`](SUPPORT.md) for issue-reporting and triage guidance.
 Development conventions live in [`docs/development/README.md`](docs/development/README.md), and release steps are documented under [`docs/operations/releasing.md`](docs/operations/releasing.md).
 
 ## Licence
-
 Dual-licensed under Apache-2.0 or MIT. Refer to [`LICENSE-APACHE`](LICENSE-APACHE), [`LICENSE-MIT`](LICENSE-MIT), and [`NOTICE`](NOTICE) for details.

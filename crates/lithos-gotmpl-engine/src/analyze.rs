@@ -22,6 +22,7 @@ pub struct TemplateAnalysis {
     pub has_template_invocation: bool,
     pub variables: Vec<VariableAccess>,
     pub functions: Vec<FunctionCall>,
+    pub unknown_functions: Vec<FunctionCall>,
     pub templates: Vec<TemplateCall>,
     pub controls: Vec<ControlUsage>,
     pub issues: Vec<AnalysisIssue>,
@@ -114,6 +115,7 @@ struct Analyzer<'a> {
     registry: Option<&'a FunctionRegistry>,
     variables: Vec<VariableAccess>,
     functions: Vec<FunctionCall>,
+    unknown_functions: Vec<FunctionCall>,
     templates: Vec<TemplateCall>,
     controls: Vec<ControlUsage>,
     issues: Vec<AnalysisIssue>,
@@ -128,6 +130,7 @@ impl<'a> Analyzer<'a> {
             registry,
             variables: Vec::new(),
             functions: Vec::new(),
+            unknown_functions: Vec::new(),
             templates: Vec::new(),
             controls: Vec::new(),
             issues: Vec::new(),
@@ -148,6 +151,7 @@ impl<'a> Analyzer<'a> {
             has_template_invocation: self.has_template,
             variables: self.variables,
             functions: self.functions,
+            unknown_functions: self.unknown_functions,
             templates: self.templates,
             controls: self.controls,
             issues: self.issues,
@@ -179,6 +183,11 @@ impl<'a> Analyzer<'a> {
         });
         self.visit_pipeline(&node.pipeline, node.span);
         self.walk_block(&node.then_block);
+        for branch in &node.else_if_branches {
+            self.inspect_tokens(&branch.tokens);
+            self.visit_pipeline(&branch.pipeline, branch.span);
+            self.walk_block(&branch.block);
+        }
         if let Some(else_block) = &node.else_block {
             self.walk_block(else_block);
         }
@@ -308,7 +317,11 @@ impl<'a> Analyzer<'a> {
         } else {
             FunctionSource::Unknown
         };
-        self.functions.push(FunctionCall { name, span, source });
+        let call = FunctionCall { name, span, source };
+        if matches!(call.source, FunctionSource::Unknown) {
+            self.unknown_functions.push(call.clone());
+        }
+        self.functions.push(call);
     }
 
     fn record_template(&mut self, command: &Command, span: Span, is_block: bool) {
