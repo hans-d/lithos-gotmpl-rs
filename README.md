@@ -60,7 +60,7 @@ Start at [`docs/index.md`](docs/index.md) for the curated navigation. Frequently
 - `docs/legal/` – licence compliance notes and generated reports.
 
 ## Compatibility & Caveats
-- Behaviour targets the constructs required by downstream Hydros/Lithos tooling; some `text/template` features (`else if`, `define`, dynamic template inclusion) remain unimplemented. Track progress in [`docs/reference/template-syntax-coverage.md`](docs/reference/template-syntax-coverage.md).
+- Behaviour targets the constructs required by downstream Hydros/Lithos tooling; some `text/template` features (`define`, dynamic template inclusion) remain unimplemented. Track progress in [`docs/reference/template-syntax-coverage.md`](docs/reference/template-syntax-coverage.md).
 - Deterministic map helpers (`keys`, `values`) intentionally diverge from Go’s random iteration order.
 - The Go-based `go-sanity` runner is a development aid that mirrors upstream Sprig; install Go 1.25.1+ to enable the compat test suite.
 

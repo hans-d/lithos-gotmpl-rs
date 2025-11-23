@@ -60,6 +60,14 @@ fn go_sanity_matches_sprig_examples() {
         .parent()
         .expect("missing workspace root")
         .join("test-cases/lithos-sprig.json");
+    let go_cache = workspace_root.join("target/go-cache");
+    fs::create_dir_all(&go_cache).unwrap_or_else(|err| {
+        panic!(
+            "failed to create go-cache directory at {}: {}",
+            go_cache.display(),
+            err
+        )
+    });
     let output = run_go_sanity(&runner_dir, &go_cache, &sprig_cases_path, true);
 
     assert!(
@@ -189,9 +197,6 @@ fn verify_directory_cases(
     if !dir_root.exists() {
         return;
     }
-
-    let go_cache = workspace_root.join("target/go-cache");
-    let _ = fs::create_dir_all(&go_cache);
 
     for entry in fs::read_dir(&dir_root).expect("read sprig test-cases directory") {
         let entry = entry.expect("read sprig test case entry");
