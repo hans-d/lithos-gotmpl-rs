@@ -2,22 +2,21 @@
 use lithos_gotmpl_engine::{Error, EvalContext};
 use serde_json::{Map, Value};
 
-use super::{expect_exact_args, expect_min_args, expect_string};
+use super::{expect_exact_args, expect_min_args, expect_string, register_helper};
 
 pub fn register(builder: &mut lithos_gotmpl_engine::FunctionRegistryBuilder) {
-    builder
-        .register("dict", dict)
-        .register("get", get)
-        .register("set", set)
-        .register("unset", unset)
-        .register("merge", merge)
-        .register("hasKey", has_key)
-        .register("keys", keys)
-        .register("values", values)
-        .register("pick", pick)
-        .register("omit", omit)
-        .register("pluck", pluck)
-        .register("dig", dig);
+    register_helper(builder, "dict", dict);
+    register_helper(builder, "get", get);
+    register_helper(builder, "set", set);
+    register_helper(builder, "unset", unset);
+    register_helper(builder, "merge", merge);
+    register_helper(builder, "hasKey", has_key);
+    register_helper(builder, "keys", keys);
+    register_helper(builder, "values", values);
+    register_helper(builder, "pick", pick);
+    register_helper(builder, "omit", omit);
+    register_helper(builder, "pluck", pluck);
+    register_helper(builder, "dig", dig);
 }
 
 pub fn dict(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {

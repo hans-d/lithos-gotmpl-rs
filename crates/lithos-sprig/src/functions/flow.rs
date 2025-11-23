@@ -2,24 +2,23 @@
 use lithos_gotmpl_engine::{Error, EvalContext};
 use serde_json::Value;
 
-use super::{expect_exact_args, expect_min_args, expect_string};
+use super::{expect_exact_args, expect_min_args, expect_string, register_helper};
 use super::{is_empty, value_to_string};
 
 pub fn register(builder: &mut lithos_gotmpl_engine::FunctionRegistryBuilder) {
-    builder
-        .register("default", default)
-        .register("coalesce", coalesce)
-        .register("ternary", ternary)
-        .register("empty", empty)
-        .register("fail", fail)
-        .register("fromJson", from_json)
-        .register("mustFromJson", must_from_json)
-        .register("toJson", to_json)
-        .register("mustToJson", must_to_json)
-        .register("toPrettyJson", to_pretty_json)
-        .register("mustToPrettyJson", must_to_pretty_json)
-        .register("toRawJson", to_raw_json)
-        .register("mustToRawJson", must_to_raw_json);
+    register_helper(builder, "default", default);
+    register_helper(builder, "coalesce", coalesce);
+    register_helper(builder, "ternary", ternary);
+    register_helper(builder, "empty", empty);
+    register_helper(builder, "fail", fail);
+    register_helper(builder, "fromJson", from_json);
+    register_helper(builder, "mustFromJson", must_from_json);
+    register_helper(builder, "toJson", to_json);
+    register_helper(builder, "mustToJson", must_to_json);
+    register_helper(builder, "toPrettyJson", to_pretty_json);
+    register_helper(builder, "mustToPrettyJson", must_to_pretty_json);
+    register_helper(builder, "toRawJson", to_raw_json);
+    register_helper(builder, "mustToRawJson", must_to_raw_json);
 }
 
 // NOTE: Every helper takes `&mut EvalContext` even when the body does not need

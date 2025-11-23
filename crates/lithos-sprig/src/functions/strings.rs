@@ -5,7 +5,7 @@ use serde_json::{json, Value};
 
 use super::{
     clamp_char_range, expect_exact_args, expect_min_args, expect_string, expect_usize,
-    value_to_string,
+    register_helper, value_to_string,
 };
 
 type StringFunction = fn(&mut EvalContext, &[Value]) -> Result<Value, Error>;
@@ -54,7 +54,7 @@ pub fn register(builder: &mut lithos_gotmpl_engine::FunctionRegistryBuilder) {
         .chain(SEARCH_FUNCS.iter())
         .chain(FORMATTING_FUNCS.iter())
     {
-        builder.register(name, func);
+        register_helper(builder, name, func);
     }
 }
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
-#[cfg(test)]
+use lithos_gotmpl_engine::runtime_hot;
 use lithos_gotmpl_engine::EvalContext;
 use lithos_gotmpl_engine::{is_empty, is_truthy, value_to_string, Error, FunctionRegistryBuilder};
 use serde_json::Value;
@@ -21,6 +21,29 @@ pub fn install_all(builder: &mut FunctionRegistryBuilder) {
     string_slice::register(builder);
     lists::register(builder);
     dict::register(builder);
+}
+
+fn invoke_fast_passthrough<'a>(
+    ctx: &mut runtime_hot::EvalContextHot<'a>,
+    args: &[runtime_hot::ValueView<'a>],
+    func: fn(&mut EvalContext, &[Value]) -> Result<Value, Error>,
+) -> Result<runtime_hot::ValueSlot<'a>, Error> {
+    let snapshot = ctx.snapshot();
+    let mut legacy_ctx = EvalContext::from_snapshot(snapshot, ctx.functions());
+    let owned_args: Vec<Value> = args.iter().map(|view| view.as_value().clone()).collect();
+    func(&mut legacy_ctx, &owned_args).map(runtime_hot::ValueSlot::owned)
+}
+
+pub(crate) fn register_helper(
+    builder: &mut FunctionRegistryBuilder,
+    name: &str,
+    func: fn(&mut EvalContext, &[Value]) -> Result<Value, Error>,
+) {
+    builder.register_fast_with_compat(
+        name,
+        move |ctx, args| invoke_fast_passthrough(ctx, args, func),
+        func,
+    );
 }
 
 pub(crate) fn expect_min_args(name: &'static str, args: &[Value], min: usize) -> Result<(), Error> {

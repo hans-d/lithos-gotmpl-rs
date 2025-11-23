@@ -3,15 +3,14 @@ use lithos_gotmpl_engine::{Error, EvalContext};
 use serde_json::{Map, Value};
 
 use super::value_to_string;
-use super::{expect_array, expect_exact_args, expect_string};
+use super::{expect_array, expect_exact_args, expect_string, register_helper};
 
 pub fn register(builder: &mut lithos_gotmpl_engine::FunctionRegistryBuilder) {
-    builder
-        .register("splitList", split_list)
-        .register("split", split_map)
-        .register("splitn", splitn)
-        .register("join", join)
-        .register("sortAlpha", sort_alpha);
+    register_helper(builder, "splitList", split_list);
+    register_helper(builder, "split", split_map);
+    register_helper(builder, "splitn", splitn);
+    register_helper(builder, "join", join);
+    register_helper(builder, "sortAlpha", sort_alpha);
 }
 
 pub fn split_list(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
