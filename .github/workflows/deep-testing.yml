@@ -136,7 +136,8 @@ jobs:
             url="https://github.com/casey/just/releases/download/${JUST_VERSION}/${archive}"
             tmpdir="$(mktemp -d)"
             trap 'rm -rf "${tmpdir}"' EXIT
-            curl --fail --location --show-error --retry 5 --retry-delay 2 "${url}" -o "${tmpdir}/${archive}"
+            curl --fail --location --show-error --retry 5 \
+              --retry-delay 2 "${url}" -o "${tmpdir}/${archive}"
             tar -xzf "${tmpdir}/${archive}" -C "${tmpdir}"
             mkdir -p "${HOME}/.local/bin"
             install -m 0755 "${tmpdir}/just" "${HOME}/.local/bin/just"

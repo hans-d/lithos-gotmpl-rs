@@ -42,6 +42,9 @@
     "name": "else-with-is-invalid",
     "template": "{{ if true }}A{{ else with . }}B{{ end }}",
     "data": {},
-    "error": "invalid else-if: expected 'if' after 'else'"
+    "error": [
+      "invalid else-if: expected 'if' after 'else'",
+      "unexpected <with> in input"
+    ]
   }
 ]
