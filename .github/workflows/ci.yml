@@ -101,7 +101,7 @@ jobs:
           toolchain: stable
       - name: Cache Rust tooling
         # yamllint disable-line rule:comments
-        uses: step-security/rust-cache@f8fba7098297c8c53a7c9a30575ec2ad4ad85056 # v2.8.2
+        uses: Swatinem/rust-cache@v2.8.1
       - name: Install just
         run: |
           set -euo pipefail
@@ -168,7 +168,7 @@ jobs:
           toolchain: stable
       - name: Cache Rust tooling
         # yamllint disable-line rule:comments
-        uses: step-security/rust-cache@f8fba7098297c8c53a7c9a30575ec2ad4ad85056 # v2.8.2
+        uses: Swatinem/rust-cache@v2.8.1
       - name: Set up Go
         # yamllint disable-line rule:comments
         uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
@@ -259,7 +259,7 @@ jobs:
           components: rustfmt, clippy
       - name: Cache Rust tooling
         # yamllint disable-line rule:comments
-        uses: step-security/rust-cache@f8fba7098297c8c53a7c9a30575ec2ad4ad85056 # v2.8.2
+        uses: Swatinem/rust-cache@v2.8.1
       - name: Install cargo-geiger
         run: |
           if ! command -v cargo-geiger >/dev/null 2>&1; then
