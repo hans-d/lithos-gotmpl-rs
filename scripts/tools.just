@@ -98,7 +98,7 @@ ensure-cargo-fuzz:
 
 install-cargo-fuzz:
     if ! command -v cargo-fuzz >/dev/null 2>&1; then \
-        cargo install cargo-fuzz; \
+        cargo install --locked cargo-fuzz; \
     fi
 
 # yamllint
@@ -150,7 +150,7 @@ ensure-release-plz:
 
 install-release-plz:
     if ! command -v release-plz >/dev/null 2>&1; then \
-        cargo install release-plz; \
+        cargo install --locked release-plz; \
     fi
 
 # syft
