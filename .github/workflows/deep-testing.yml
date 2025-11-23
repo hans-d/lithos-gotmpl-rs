@@ -13,9 +13,6 @@ defaults:
   run:
     shell: bash
 
-env:
-  JUST_VERSION: "1.36.0"
-
 # yamllint disable-line rule:truthy
 on:
   schedule:
@@ -38,38 +35,21 @@ jobs:
       - name: Checkout repository
         # yamllint disable-line rule:comments
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
-        if: ${{ hashFiles('fuzz/Cargo.toml') != '' }}
-
-      - name: Set up Rust nightly
-        # yamllint disable-line rule:comments
-        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
-        if: ${{ hashFiles('fuzz/Cargo.toml') != '' }}
+      - name: Prepare toolchains
+        uses: ./.github/actions/setup-tools
         with:
-          toolchain: nightly
-
-      - name: Cache Rust tooling
-        # yamllint disable-line rule:comments
-        uses: Swatinem/rust-cache@v2.8.1
-        if: ${{ hashFiles('fuzz/Cargo.toml') != '' }}
-
-      - name: Install cargo-fuzz
-        if: ${{ hashFiles('fuzz/Cargo.toml') != '' }}
-        run: cargo install cargo-fuzz
-
+          install_rust: "true"
+          rust_toolchain: nightly
       - name: Fuzz parser (10 min)
-        if: ${{ hashFiles('fuzz/Cargo.toml') != '' }}
-        run: cargo +nightly fuzz run template_parse -- -max_total_time=600
+        run: just rust ci-fuzz-parse fuzz_time=600
         continue-on-error: true
-
       - name: Fuzz renderer (10 min)
-        if: ${{ hashFiles('fuzz/Cargo.toml') != '' }}
-        run: cargo +nightly fuzz run template_render -- -max_total_time=600
+        run: just rust ci-fuzz-render fuzz_time=600
         continue-on-error: true
-
       - name: Upload corpus if crashes found
         # yamllint disable-line rule:comments
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
-        if: ${{ failure() && hashFiles('fuzz/Cargo.toml') != '' }}
+        if: ${{ failure() }}
         with:
           name: fuzz-artifacts
           path: fuzz/artifacts/
@@ -81,8 +61,6 @@ jobs:
     if: >
       github.event_name == 'schedule' &&
       github.event.schedule == '0 0 1 * *'
-    permissions:
-      contents: read
     steps:
       - name: Harden runner
         # yamllint disable-line rule:comments
@@ -92,64 +70,12 @@ jobs:
       - name: Checkout repository
         # yamllint disable-line rule:comments
         uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
-
-      - name: Set up Rust
-        # yamllint disable-line rule:comments
-        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+      - name: Prepare toolchains
+        uses: ./.github/actions/setup-tools
         with:
-          toolchain: stable
-
-      - name: Cache Rust tooling
-        # yamllint disable-line rule:comments
-        uses: Swatinem/rust-cache@v2.8.1
-
-      - name: Install just & cargo-mutants
-        run: |
-          set -euo pipefail
-          if ! command -v just >/dev/null 2>&1; then
-            arch="${RUNNER_ARCH:-$(uname -m)}"
-            case "${arch}" in
-              X64|x86_64|amd64) just_arch="x86_64" ;;
-              ARM64|arm64|aarch64) just_arch="aarch64" ;;
-              *)
-                echo "Unsupported architecture: ${arch}" >&2
-                exit 1
-                ;;
-            esac
-
-            case "${RUNNER_OS}" in
-              Linux)
-                just_platform="unknown-linux-musl"
-                archive_ext="tar.gz"
-                ;;
-              macOS)
-                just_platform="apple-darwin"
-                archive_ext="tar.gz"
-                ;;
-              *)
-                echo "Unsupported runner OS: ${RUNNER_OS}" >&2
-                exit 1
-                ;;
-            esac
-
-            archive="just-${JUST_VERSION}-${just_arch}-${just_platform}.${archive_ext}"
-            url="https://github.com/casey/just/releases/download/${JUST_VERSION}/${archive}"
-            tmpdir="$(mktemp -d)"
-            trap 'rm -rf "${tmpdir}"' EXIT
-            curl --fail --location --show-error --retry 5 \
-              --retry-delay 2 "${url}" -o "${tmpdir}/${archive}"
-            tar -xzf "${tmpdir}/${archive}" -C "${tmpdir}"
-            mkdir -p "${HOME}/.local/bin"
-            install -m 0755 "${tmpdir}/just" "${HOME}/.local/bin/just"
-          fi
-          echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
-          if ! command -v cargo-mutants >/dev/null 2>&1; then
-            cargo install --locked cargo-mutants
-          fi
-
+          install_rust: "true"
       - name: Run mutation tests
-        run: just ci-mutation
-
+        run: just rust ci-mutation
       - name: Upload results
         # yamllint disable-line rule:comments
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0

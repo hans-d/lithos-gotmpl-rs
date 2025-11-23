@@ -70,4 +70,15 @@ Consult [`SUPPORT.md`](SUPPORT.md) for issue-reporting and triage guidance.
 Development conventions live in [`docs/development/README.md`](docs/development/README.md), and release steps are documented under [`docs/operations/releasing.md`](docs/operations/releasing.md).
 
 ## Licence
-Dual-licensed under Apache-2.0 or MIT. Refer to [`LICENSE-APACHE`](LICENSE-APACHE), [`LICENSE-MIT`](LICENSE-MIT), and [`NOTICE`](NOTICE) for details.
+This project is dual-licensed under the Apache License 2.0 and the MIT License.
+
+You may use, copy, modify, and distribute this software under the terms of either:
+
+- Apache License, Version 2.0 (see `LICENSE-APACHE`)
+- MIT License (see `LICENSE-MIT`)
+
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in this project shall be dual licensed as above, without any
+additional terms or conditions.
+
+See also [`NOTICE`](NOTICE).

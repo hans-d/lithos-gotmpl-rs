@@ -51,8 +51,9 @@ impl ExpectedError {
     fn matches(&self, message: &str) -> bool {
         match self {
             ExpectedError::Single(pattern) => message.contains(pattern),
-            ExpectedError::Multiple(patterns) =>
-                patterns.iter().any(|pattern| message.contains(pattern)),
+            ExpectedError::Multiple(patterns) => {
+                patterns.iter().any(|pattern| message.contains(pattern))
+            }
         }
     }
 

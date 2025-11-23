@@ -1,0 +1,9 @@
+set shell := ["bash", "-cu"]
+
+mod tools '../scripts/tools.just'
+
+default:
+    just --list
+
+lint: tools::ensure-actionlint
+    actionlint
