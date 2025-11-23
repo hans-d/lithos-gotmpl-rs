@@ -62,7 +62,7 @@ ensure-go-licenses:
 
 install-go-licenses:
     if ! command -v go-licenses >/dev/null 2>&1; then \
-        go install github.com/google/go-licenses/v2@latest; \
+        go install github.com/google/go-licenses/v2@v2.0.1; \
     fi
 
 # cargo-tarpaulin
