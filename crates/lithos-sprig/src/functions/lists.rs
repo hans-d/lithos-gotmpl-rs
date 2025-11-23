@@ -2,25 +2,24 @@
 use lithos_gotmpl_engine::{coerce_number, Error, EvalContext};
 use serde_json::{Number, Value};
 
-use super::{expect_array, expect_exact_args, expect_min_args};
+use super::{expect_array, expect_exact_args, expect_min_args, register_helper};
 
 pub fn register(builder: &mut lithos_gotmpl_engine::FunctionRegistryBuilder) {
-    builder
-        .register("list", list)
-        .register("first", first)
-        .register("last", last)
-        .register("rest", rest)
-        .register("initial", initial)
-        .register("append", append)
-        .register("prepend", prepend)
-        .register("concat", concat)
-        .register("reverse", reverse)
-        .register("compact", compact)
-        .register("uniq", uniq)
-        .register("without", without)
-        .register("has", has)
-        .register("max", max)
-        .register("min", min);
+    register_helper(builder, "list", list);
+    register_helper(builder, "first", first);
+    register_helper(builder, "last", last);
+    register_helper(builder, "rest", rest);
+    register_helper(builder, "initial", initial);
+    register_helper(builder, "append", append);
+    register_helper(builder, "prepend", prepend);
+    register_helper(builder, "concat", concat);
+    register_helper(builder, "reverse", reverse);
+    register_helper(builder, "compact", compact);
+    register_helper(builder, "uniq", uniq);
+    register_helper(builder, "without", without);
+    register_helper(builder, "has", has);
+    register_helper(builder, "max", max);
+    register_helper(builder, "min", min);
 }
 
 pub fn list(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {

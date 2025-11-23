@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
+use lithos_gotmpl_engine::runtime_hot;
 pub use lithos_gotmpl_engine::{
     analyze_template, coerce_number, is_empty, is_truthy, value_to_string, AnalysisIssue,
     Certainty, ControlKind, ControlUsage, Error, EvalContext, FunctionCall, FunctionRegistry,
@@ -75,6 +76,12 @@ struct SliceIndices {
     start: usize,
     end: usize,
 }
+
+macro_rules! register_builtin {
+    ($builder:expr, $name:expr, $fast:path, $legacy:path) => {{
+        $builder.register_fast_with_compat($name, $fast, $legacy);
+    }};
+}
 /// Builds a registry that mirrors the helper set Go's `text/template` exposes by
 /// default, keeping Lithos-compatible templates aligned with the reference
 /// implementation.
@@ -86,26 +93,25 @@ pub fn text_template_functions() -> FunctionRegistry {
 
 /// Installs the standard Go text/template helper functions into an existing registry builder.
 pub fn install_text_template_functions(builder: &mut FunctionRegistryBuilder) {
-    builder
-        .register("and", builtin_and)
-        .register("call", builtin_call)
-        .register("html", builtin_html)
-        .register("eq", builtin_eq)
-        .register("ge", builtin_ge)
-        .register("gt", builtin_gt)
-        .register("index", builtin_index)
-        .register("js", builtin_js)
-        .register("len", builtin_len)
-        .register("le", builtin_le)
-        .register("lt", builtin_lt)
-        .register("ne", builtin_ne)
-        .register("not", builtin_not)
-        .register("print", builtin_print)
-        .register("println", builtin_println)
-        .register("or", builtin_or)
-        .register("printf", builtin_printf)
-        .register("slice", builtin_slice)
-        .register("urlquery", builtin_urlquery);
+    register_builtin!(builder, "and", fast_builtin_and, builtin_and);
+    register_builtin!(builder, "call", fast_builtin_call, builtin_call);
+    register_builtin!(builder, "html", fast_builtin_html, builtin_html);
+    register_builtin!(builder, "eq", fast_builtin_eq, builtin_eq);
+    register_builtin!(builder, "ge", fast_builtin_ge, builtin_ge);
+    register_builtin!(builder, "gt", fast_builtin_gt, builtin_gt);
+    register_builtin!(builder, "index", fast_builtin_index, builtin_index);
+    register_builtin!(builder, "js", fast_builtin_js, builtin_js);
+    register_builtin!(builder, "len", fast_builtin_len, builtin_len);
+    register_builtin!(builder, "le", fast_builtin_le, builtin_le);
+    register_builtin!(builder, "lt", fast_builtin_lt, builtin_lt);
+    register_builtin!(builder, "ne", fast_builtin_ne, builtin_ne);
+    register_builtin!(builder, "not", fast_builtin_not, builtin_not);
+    register_builtin!(builder, "print", fast_builtin_print, builtin_print);
+    register_builtin!(builder, "println", fast_builtin_println, builtin_println);
+    register_builtin!(builder, "or", fast_builtin_or, builtin_or);
+    register_builtin!(builder, "printf", fast_builtin_printf, builtin_printf);
+    register_builtin!(builder, "slice", fast_builtin_slice, builtin_slice);
+    register_builtin!(builder, "urlquery", fast_builtin_urlquery, builtin_urlquery);
 }
 
 fn builtin_eq(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
@@ -115,24 +121,76 @@ fn builtin_eq(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
     Ok(Value::Bool(args[0] == args[1]))
 }
 
+fn fast_builtin_eq<'a>(
+    _ctx: &mut runtime_hot::EvalContextHot<'a>,
+    args: &[runtime_hot::ValueView<'a>],
+) -> Result<runtime_hot::ValueSlot<'a>, Error> {
+    if args.len() < 2 {
+        return Err(Error::render("eq expects two arguments", None));
+    }
+    Ok(runtime_hot::ValueSlot::owned(Value::Bool(
+        args[0].as_value() == args[1].as_value(),
+    )))
+}
+
 fn builtin_ne(ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
     builtin_eq(ctx, args).map(|v| Value::Bool(!v.as_bool().unwrap()))
+}
+
+fn fast_builtin_ne<'a>(
+    ctx: &mut runtime_hot::EvalContextHot<'a>,
+    args: &[runtime_hot::ValueView<'a>],
+) -> Result<runtime_hot::ValueSlot<'a>, Error> {
+    let result = fast_builtin_eq(ctx, args)?.into_owned();
+    Ok(runtime_hot::ValueSlot::owned(Value::Bool(
+        !result
+            .as_bool()
+            .expect("fast_builtin_eq always returns bool"),
+    )))
 }
 
 fn builtin_lt(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
     comparison(args, |a, b| a < b, |a, b| a < b)
 }
 
+fn fast_builtin_lt<'a>(
+    _ctx: &mut runtime_hot::EvalContextHot<'a>,
+    args: &[runtime_hot::ValueView<'a>],
+) -> Result<runtime_hot::ValueSlot<'a>, Error> {
+    fast_comparison(args, |a, b| a < b, |a, b| a < b)
+}
+
 fn builtin_le(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
     comparison(args, |a, b| a <= b, |a, b| a <= b)
+}
+
+fn fast_builtin_le<'a>(
+    _ctx: &mut runtime_hot::EvalContextHot<'a>,
+    args: &[runtime_hot::ValueView<'a>],
+) -> Result<runtime_hot::ValueSlot<'a>, Error> {
+    fast_comparison(args, |a, b| a <= b, |a, b| a <= b)
 }
 
 fn builtin_gt(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
     comparison(args, |a, b| a > b, |a, b| a > b)
 }
 
+fn fast_builtin_gt<'a>(
+    _ctx: &mut runtime_hot::EvalContextHot<'a>,
+    args: &[runtime_hot::ValueView<'a>],
+) -> Result<runtime_hot::ValueSlot<'a>, Error> {
+    fast_comparison(args, |a, b| a > b, |a, b| a > b)
+}
+
 fn builtin_ge(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
     comparison(args, |a, b| a >= b, |a, b| a >= b)
+}
+
+fn fast_builtin_ge<'a>(
+    _ctx: &mut runtime_hot::EvalContextHot<'a>,
+    args: &[runtime_hot::ValueView<'a>],
+) -> Result<runtime_hot::ValueSlot<'a>, Error> {
+    fast_comparison(args, |a, b| a >= b, |a, b| a >= b)
 }
 
 fn comparison<F, G>(args: &[Value], num: F, str_op: G) -> Result<Value, Error>
@@ -158,6 +216,33 @@ where
             None,
         ))
     }
+}
+
+fn fast_comparison<'a, F, G>(
+    args: &[runtime_hot::ValueView<'a>],
+    num: F,
+    str_op: G,
+) -> Result<runtime_hot::ValueSlot<'a>, Error>
+where
+    F: Fn(f64, f64) -> bool,
+    G: Fn(&str, &str) -> bool,
+{
+    if args.len() < 2 {
+        return Err(Error::render("comparison expects two arguments", None));
+    }
+    let lhs = args[0].as_value();
+    let rhs = args[1].as_value();
+    let result = if lhs.is_number() && rhs.is_number() {
+        Value::Bool(num(coerce_number(lhs)?, coerce_number(rhs)?))
+    } else if let (Some(l), Some(r)) = (lhs.as_str(), rhs.as_str()) {
+        Value::Bool(str_op(l, r))
+    } else {
+        return Err(Error::render(
+            "comparison requires both arguments to be numbers or strings",
+            None,
+        ));
+    };
+    Ok(runtime_hot::ValueSlot::owned(result))
 }
 
 fn compare_numbers<F>(lhs: &Value, rhs: &Value, cmp: F) -> Result<Value, Error>
@@ -205,6 +290,46 @@ fn builtin_printf(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error
     Ok(Value::String(output))
 }
 
+fn fast_builtin_printf<'a>(
+    _ctx: &mut runtime_hot::EvalContextHot<'a>,
+    args: &[runtime_hot::ValueView<'a>],
+) -> Result<runtime_hot::ValueSlot<'a>, Error> {
+    if args.is_empty() {
+        return Err(Error::render("printf expects format string", None));
+    }
+    let format = args[0]
+        .as_str()
+        .ok_or_else(|| Error::render("printf expects format string as first argument", None))?;
+
+    let mut output = String::new();
+    let mut chars = format.chars();
+    let mut arg_index = 1usize;
+
+    while let Some(ch) = chars.next() {
+        if ch != '%' {
+            output.push(ch);
+            continue;
+        }
+
+        let specifier = ParsedSpecifier::parse(&mut chars)?;
+
+        if specifier.needs_argument() {
+            let arg = args
+                .get(arg_index)
+                .map(|view| view.as_value())
+                .ok_or_else(|| Error::render("not enough arguments for printf", None))?;
+            arg_index += 1;
+            output.push_str(&specifier.format(Some(arg))?);
+        } else {
+            output.push_str(&specifier.format(None)?);
+        }
+    }
+
+    append_extra_args_views(&mut output, &args[arg_index..]);
+
+    Ok(runtime_hot::ValueSlot::owned(Value::String(output)))
+}
+
 fn append_extra_args(output: &mut String, extra_args: &[Value]) {
     let mut extras = extra_args.iter();
     if let Some(first) = extras.next() {
@@ -216,12 +341,34 @@ fn append_extra_args(output: &mut String, extra_args: &[Value]) {
     }
 }
 
+fn append_extra_args_views(output: &mut String, extra_args: &[runtime_hot::ValueView<'_>]) {
+    let mut extras = extra_args.iter();
+    if let Some(first) = extras.next() {
+        output.push_str(&value_to_string(first.as_value()));
+        for arg in extras {
+            output.push(' ');
+            output.push_str(&value_to_string(arg.as_value()));
+        }
+    }
+}
+
 fn builtin_print(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
     let mut output = String::new();
     for value in args {
         output.push_str(&value_to_string(value));
     }
     Ok(Value::String(output))
+}
+
+fn fast_builtin_print<'a>(
+    _ctx: &mut runtime_hot::EvalContextHot<'a>,
+    args: &[runtime_hot::ValueView<'a>],
+) -> Result<runtime_hot::ValueSlot<'a>, Error> {
+    let mut output = String::new();
+    for value in args {
+        output.push_str(&value_to_string(value.as_value()));
+    }
+    Ok(runtime_hot::ValueSlot::owned(Value::String(output)))
 }
 
 fn builtin_println(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
@@ -238,12 +385,42 @@ fn builtin_println(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Erro
     Ok(Value::String(output))
 }
 
+fn fast_builtin_println<'a>(
+    _ctx: &mut runtime_hot::EvalContextHot<'a>,
+    args: &[runtime_hot::ValueView<'a>],
+) -> Result<runtime_hot::ValueSlot<'a>, Error> {
+    let mut output = String::new();
+    let mut first = true;
+    for value in args {
+        if !first {
+            output.push(' ');
+        }
+        first = false;
+        output.push_str(&value_to_string(value.as_value()));
+    }
+    output.push('\n');
+    Ok(runtime_hot::ValueSlot::owned(Value::String(output)))
+}
+
 fn builtin_html(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
     if args.len() != 1 {
         return Err(Error::render("html expects exactly one argument", None));
     }
     let input = value_to_string(&args[0]);
     Ok(Value::String(escape_html(&input)))
+}
+
+fn fast_builtin_html<'a>(
+    _ctx: &mut runtime_hot::EvalContextHot<'a>,
+    args: &[runtime_hot::ValueView<'a>],
+) -> Result<runtime_hot::ValueSlot<'a>, Error> {
+    if args.len() != 1 {
+        return Err(Error::render("html expects exactly one argument", None));
+    }
+    let input = value_to_string(args[0].as_value());
+    Ok(runtime_hot::ValueSlot::owned(Value::String(escape_html(
+        &input,
+    ))))
 }
 
 fn builtin_js(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
@@ -254,12 +431,38 @@ fn builtin_js(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
     Ok(Value::String(escape_js(&input)))
 }
 
+fn fast_builtin_js<'a>(
+    _ctx: &mut runtime_hot::EvalContextHot<'a>,
+    args: &[runtime_hot::ValueView<'a>],
+) -> Result<runtime_hot::ValueSlot<'a>, Error> {
+    if args.len() != 1 {
+        return Err(Error::render("js expects exactly one argument", None));
+    }
+    let input = value_to_string(args[0].as_value());
+    Ok(runtime_hot::ValueSlot::owned(Value::String(escape_js(
+        &input,
+    ))))
+}
+
 fn builtin_urlquery(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
     if args.len() != 1 {
         return Err(Error::render("urlquery expects exactly one argument", None));
     }
     let input = value_to_string(&args[0]);
     Ok(Value::String(escape_urlquery(&input)))
+}
+
+fn fast_builtin_urlquery<'a>(
+    _ctx: &mut runtime_hot::EvalContextHot<'a>,
+    args: &[runtime_hot::ValueView<'a>],
+) -> Result<runtime_hot::ValueSlot<'a>, Error> {
+    if args.len() != 1 {
+        return Err(Error::render("urlquery expects exactly one argument", None));
+    }
+    let input = value_to_string(args[0].as_value());
+    Ok(runtime_hot::ValueSlot::owned(Value::String(
+        escape_urlquery(&input),
+    )))
 }
 
 fn escape_html(input: &str) -> String {
@@ -350,6 +553,40 @@ fn builtin_index(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error>
     Ok(current)
 }
 
+fn fast_builtin_index<'a>(
+    _ctx: &mut runtime_hot::EvalContextHot<'a>,
+    args: &[runtime_hot::ValueView<'a>],
+) -> Result<runtime_hot::ValueSlot<'a>, Error> {
+    if args.is_empty() {
+        return Err(Error::render("index expects at least one argument", None));
+    }
+    let mut current = args[0].as_value().clone();
+    for key in &args[1..] {
+        current = match (&current, key.as_value()) {
+            (Value::Object(map), Value::String(s)) => map.get(s).cloned().unwrap_or(Value::Null),
+            (Value::Object(map), Value::Number(num)) => {
+                let key = num.to_string();
+                map.get(&key).cloned().unwrap_or(Value::Null)
+            }
+            (Value::Array(list), Value::Number(num)) => {
+                let idx = num
+                    .as_u64()
+                    .ok_or_else(|| Error::render("array index must be unsigned integer", None))?
+                    as usize;
+                list.get(idx).cloned().unwrap_or(Value::Null)
+            }
+            (Value::Array(list), Value::String(s)) => {
+                let idx = s
+                    .parse::<usize>()
+                    .map_err(|_| Error::render("array index must be integer", None))?;
+                list.get(idx).cloned().unwrap_or(Value::Null)
+            }
+            _ => return Err(Error::render("index expects map or array container", None)),
+        };
+    }
+    Ok(runtime_hot::ValueSlot::owned(current))
+}
+
 fn builtin_and(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
     for value in args {
         if !is_truthy(value) {
@@ -359,6 +596,22 @@ fn builtin_and(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
     Ok(args.last().cloned().unwrap_or(Value::Bool(true)))
 }
 
+fn fast_builtin_and<'a>(
+    _ctx: &mut runtime_hot::EvalContextHot<'a>,
+    args: &[runtime_hot::ValueView<'a>],
+) -> Result<runtime_hot::ValueSlot<'a>, Error> {
+    for value in args {
+        if !is_truthy(value.as_value()) {
+            return Ok(runtime_hot::ValueSlot::owned(value.as_value().clone()));
+        }
+    }
+    Ok(runtime_hot::ValueSlot::owned(
+        args.last()
+            .map(|v| v.as_value().clone())
+            .unwrap_or(Value::Bool(true)),
+    ))
+}
+
 fn builtin_or(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
     for value in args {
         if is_truthy(value) {
@@ -366,6 +619,22 @@ fn builtin_or(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
         }
     }
     Ok(args.last().cloned().unwrap_or(Value::Bool(false)))
+}
+
+fn fast_builtin_or<'a>(
+    _ctx: &mut runtime_hot::EvalContextHot<'a>,
+    args: &[runtime_hot::ValueView<'a>],
+) -> Result<runtime_hot::ValueSlot<'a>, Error> {
+    for value in args {
+        if is_truthy(value.as_value()) {
+            return Ok(runtime_hot::ValueSlot::owned(value.as_value().clone()));
+        }
+    }
+    Ok(runtime_hot::ValueSlot::owned(
+        args.last()
+            .map(|v| v.as_value().clone())
+            .unwrap_or(Value::Bool(false)),
+    ))
 }
 
 fn builtin_len(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
@@ -382,6 +651,27 @@ fn builtin_len(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
         }
     };
     Ok(Value::Number(Number::from(len as u64)))
+}
+
+fn fast_builtin_len<'a>(
+    _ctx: &mut runtime_hot::EvalContextHot<'a>,
+    args: &[runtime_hot::ValueView<'a>],
+) -> Result<runtime_hot::ValueSlot<'a>, Error> {
+    if args.len() != 1 {
+        return Err(Error::render("len expects exactly one argument", None));
+    }
+    let len = match args[0].as_value() {
+        Value::Null => 0,
+        Value::String(s) => s.len(),
+        Value::Array(list) => list.len(),
+        Value::Object(map) => map.len(),
+        Value::Bool(_) | Value::Number(_) => {
+            return Err(Error::render("len expects array, map, or string", None));
+        }
+    };
+    Ok(runtime_hot::ValueSlot::owned(Value::Number(Number::from(
+        len as u64,
+    ))))
 }
 
 fn builtin_slice(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
@@ -410,6 +700,47 @@ fn builtin_slice(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error>
             None,
         )),
     }
+}
+
+fn fast_builtin_slice<'a>(
+    _ctx: &mut runtime_hot::EvalContextHot<'a>,
+    args: &[runtime_hot::ValueView<'a>],
+) -> Result<runtime_hot::ValueSlot<'a>, Error> {
+    if args.is_empty() {
+        return Err(Error::render("slice expects at least one argument", None));
+    }
+    let target = args[0].as_value();
+    let result = match target {
+        Value::String(s) => {
+            let len = s.len();
+            let SliceIndices { start, end } = parse_slice_indices_views(&args[1..], len)?;
+            let slice = s
+                .get(start..end)
+                .ok_or_else(|| Error::render("slice indices not on char boundaries", None))?;
+            Value::String(slice.to_string())
+        }
+        Value::Array(list) => {
+            let len = list.len();
+            let SliceIndices { start, end } = parse_slice_indices_views(&args[1..], len)?;
+            Value::Array(list[start..end].to_vec())
+        }
+        Value::Null => Value::Array(Vec::new()),
+        _ => {
+            return Err(Error::render(
+                "slice expects string or array as first argument",
+                None,
+            ))
+        }
+    };
+    Ok(runtime_hot::ValueSlot::owned(result))
+}
+
+fn parse_slice_indices_views(
+    indices: &[runtime_hot::ValueView<'_>],
+    len: usize,
+) -> Result<SliceIndices, Error> {
+    let owned: Vec<Value> = indices.iter().map(|view| view.as_value().clone()).collect();
+    parse_slice_indices(&owned, len)
 }
 
 fn parse_slice_indices(indices: &[Value], len: usize) -> Result<SliceIndices, Error> {
@@ -462,11 +793,46 @@ fn builtin_call(ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
     func(ctx, &args[1..])
 }
 
+fn fast_builtin_call<'a>(
+    ctx: &mut runtime_hot::EvalContextHot<'a>,
+    args: &[runtime_hot::ValueView<'a>],
+) -> Result<runtime_hot::ValueSlot<'a>, Error> {
+    if args.is_empty() {
+        return Err(Error::render("call expects at least one argument", None));
+    }
+    let func_name = args[0]
+        .as_str()
+        .ok_or_else(|| Error::render("call expects function name as string", None))?;
+    let func = ctx
+        .functions()
+        .get(func_name)
+        .ok_or_else(|| Error::render(format!("unknown function \"{func_name}\""), None))?;
+    let snapshot = ctx.snapshot();
+    let mut legacy_ctx = EvalContext::from_snapshot(snapshot, ctx.functions());
+    let owned_args: Vec<Value> = args[1..]
+        .iter()
+        .map(|view| view.as_value().clone())
+        .collect();
+    func(&mut legacy_ctx, &owned_args).map(runtime_hot::ValueSlot::owned)
+}
+
 fn builtin_not(_ctx: &mut EvalContext, args: &[Value]) -> Result<Value, Error> {
     if args.len() != 1 {
         return Err(Error::render("not expects exactly one argument", None));
     }
     Ok(Value::Bool(!is_truthy(&args[0])))
+}
+
+fn fast_builtin_not<'a>(
+    _ctx: &mut runtime_hot::EvalContextHot<'a>,
+    args: &[runtime_hot::ValueView<'a>],
+) -> Result<runtime_hot::ValueSlot<'a>, Error> {
+    if args.len() != 1 {
+        return Err(Error::render("not expects exactly one argument", None));
+    }
+    Ok(runtime_hot::ValueSlot::owned(Value::Bool(!is_truthy(
+        args[0].as_value(),
+    ))))
 }
 
 fn format_integer(value: &Value) -> Result<String, Error> {

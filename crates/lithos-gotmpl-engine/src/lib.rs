@@ -10,6 +10,8 @@ mod error;
 pub mod lexer;
 mod parser;
 mod runtime;
+pub mod runtime_hot;
+pub mod telemetry;
 
 pub use analyze::{
     analyze_template, AnalysisIssue, Certainty, ControlKind, ControlUsage, FunctionCall,
@@ -27,27 +29,76 @@ pub use runtime::{
 };
 
 use serde_json::{Number, Value};
+use std::env;
 use std::fmt;
+use std::sync::{Arc, Mutex};
+#[cfg(feature = "telemetry")]
+use std::time::Instant;
+
+#[cfg(feature = "telemetry")]
+use crate::telemetry;
+
+/// Shared inner state for parsed templates.
+#[derive(Clone)]
+struct TemplateInner {
+    name: Arc<str>,
+    source: Arc<str>,
+    ast: Arc<Ast>,
+    functions: FunctionRegistry,
+}
+
+impl TemplateInner {
+    fn new(name: &str, source: &str, ast: Ast, functions: FunctionRegistry) -> Self {
+        Self {
+            name: Arc::<str>::from(name),
+            source: Arc::<str>::from(source),
+            ast: Arc::new(ast),
+            functions,
+        }
+    }
+
+    fn name(&self) -> &str {
+        self.name.as_ref()
+    }
+
+    fn source(&self) -> &str {
+        self.source.as_ref()
+    }
+
+    fn ast(&self) -> &Ast {
+        self.ast.as_ref()
+    }
+
+    fn functions(&self) -> FunctionRegistry {
+        self.functions.clone()
+    }
+
+    fn set_functions(&mut self, functions: FunctionRegistry) {
+        self.functions = functions;
+    }
+}
 
 /// Parsed template with associated AST and original source.
 #[derive(Clone)]
 pub struct Template {
-    name: String,
-    source: String,
-    ast: Ast,
-    functions: FunctionRegistry,
+    inner: Arc<TemplateInner>,
+    last_render: Arc<Mutex<Option<Arc<[u8]>>>>,
 }
 
 impl fmt::Debug for Template {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Template")
-            .field("name", &self.name)
-            .field("source", &self.source)
+            .field("name", &self.inner.name)
+            .field("source", &self.inner.source)
             .finish()
     }
 }
 
 impl Template {
+    fn functions_ref(&self) -> &FunctionRegistry {
+        &self.inner.functions
+    }
+
     /// Parses template source into an AST representation.
     pub fn parse_str(name: &str, source: &str) -> Result<Self, Error> {
         Self::parse_with_functions(name, source, FunctionRegistry::empty())
@@ -61,54 +112,64 @@ impl Template {
     ) -> Result<Self, Error> {
         let ast = parser::parse_template(name, source)?;
         Ok(Self {
-            name: name.to_string(),
-            source: source.to_string(),
-            ast,
-            functions,
+            inner: Arc::new(TemplateInner::new(name, source, ast, functions)),
+            last_render: Arc::new(Mutex::new(None)),
         })
     }
 
     /// Returns a clone of the function registry in use.
     pub fn functions(&self) -> FunctionRegistry {
-        self.functions.clone()
+        self.inner.functions()
     }
 
     /// Replaces the function registry associated with this template.
     pub fn set_functions(&mut self, functions: FunctionRegistry) {
-        self.functions = functions;
+        if let Some(inner) = Arc::get_mut(&mut self.inner) {
+            inner.set_functions(functions);
+        } else {
+            let new_inner =
+                TemplateInner::new(self.name(), self.source(), self.ast().clone(), functions);
+            self.inner = Arc::new(new_inner);
+        }
+        self.clear_last_render();
     }
 
     /// Consumes the template and returns a new instance with the provided function registry.
     pub fn with_functions(mut self, functions: FunctionRegistry) -> Self {
-        self.functions = functions;
+        self.set_functions(functions);
         self
     }
 
     /// Returns the original template name.
     pub fn name(&self) -> &str {
-        &self.name
+        self.inner.name()
     }
 
     /// Returns the original template source.
     pub fn source(&self) -> &str {
-        &self.source
+        self.inner.source()
     }
 
     /// Returns a reference to the parsed AST.
     pub fn ast(&self) -> &Ast {
-        &self.ast
+        self.inner.ast()
     }
 
     /// Runs structural analysis over the template and returns helper usage metadata.
     pub fn analyze(&self) -> TemplateAnalysis {
-        analyze::analyze_template(&self.ast, Some(&self.functions))
+        #[cfg(feature = "telemetry")]
+        let start = Instant::now();
+        let analysis = analyze::analyze_template(self.ast(), Some(self.functions_ref()));
+        #[cfg(feature = "telemetry")]
+        telemetry::record_analyze(self.name(), self.source().len(), start.elapsed(), true);
+        analysis
     }
 
     /// Returns a canonical string representation of the parsed template, similar to Go's
     /// `parse.Tree.Root.String()` output.
     pub fn to_template_string(&self) -> String {
         let mut out = String::new();
-        Self::write_block(&mut out, &self.ast.root);
+        Self::write_block(&mut out, &self.ast().root);
         out
     }
 
@@ -163,14 +224,79 @@ impl Template {
 
     /// Renders the template against the provided data.
     pub fn render(&self, data: &Value) -> Result<String, Error> {
-        let mut ctx = runtime::EvalContext::new(data.clone(), self.functions.clone());
-        let mut output = String::new();
-        Self::render_block(&mut ctx, &self.ast.root, &mut output)?;
+        #[cfg(feature = "telemetry")]
+        let start = Instant::now();
+
+        let result = self.render_impl(data);
+
+        #[cfg(feature = "telemetry")]
+        telemetry::record_render(
+            self.name(),
+            self.source().len(),
+            start.elapsed(),
+            result.is_ok(),
+        );
+        result
+    }
+
+    fn render_impl(&self, data: &Value) -> Result<String, Error> {
+        let (output, _) = self.render_and_cache(data)?;
         Ok(output)
     }
 
-    fn render_block(
-        ctx: &mut runtime::EvalContext,
+    #[allow(dead_code)]
+    pub(crate) fn render_arc(&self, data: &Value) -> Result<Arc<[u8]>, Error> {
+        let (_, arc) = self.render_and_cache(data)?;
+        Ok(arc)
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn last_render_arc(&self) -> Option<Arc<[u8]>> {
+        self.last_render
+            .lock()
+            .ok()
+            .and_then(|guard| guard.as_ref().cloned())
+    }
+
+    fn render_and_cache(&self, data: &Value) -> Result<(String, Arc<[u8]>), Error> {
+        let output = self.render_dispatch(data)?;
+        let arc = Arc::<[u8]>::from(output.as_bytes());
+        if let Ok(mut guard) = self.last_render.lock() {
+            *guard = Some(arc.clone());
+        }
+        Ok((output, arc))
+    }
+
+    fn render_dispatch(&self, data: &Value) -> Result<String, Error> {
+        Self::guard_legacy_override()?;
+        self.render_hot(data)
+    }
+
+    fn clear_last_render(&self) {
+        if let Ok(mut guard) = self.last_render.lock() {
+            guard.take();
+        }
+    }
+
+    fn guard_legacy_override() -> Result<(), Error> {
+        if let Ok(value) = env::var("LITHOS_RUNTIME") {
+            if value.eq_ignore_ascii_case("legacy") || value.eq_ignore_ascii_case("legacy-only") {
+                return Err(Error::render(
+                    "legacy runtime has been removed; unset LITHOS_RUNTIME to continue",
+                    None,
+                ));
+            }
+        }
+        Ok(())
+    }
+    fn render_hot(&self, data: &Value) -> Result<String, Error> {
+        let mut ctx = runtime_hot::EvalContextHot::new(data, self.functions());
+        let mut output = String::new();
+        Self::render_block_hot(&mut ctx, &self.ast().root, &mut output).map(|_| output)
+    }
+
+    fn render_block_hot(
+        ctx: &mut runtime_hot::EvalContextHot,
         block: &Block,
         output: &mut String,
     ) -> Result<(), Error> {
@@ -182,62 +308,66 @@ impl Template {
                     let value = ctx.eval_pipeline(&action.pipeline)?;
                     ctx.apply_bindings(&action.pipeline, &value)?;
                     if action.pipeline.declarations.is_none() {
-                        output.push_str(&runtime::value_to_string(&value));
+                        output.push_str(&runtime::value_to_string(value.as_value()));
                     }
                 }
-                Node::If(if_node) => Self::render_if(ctx, if_node, output)?,
-                Node::Range(range_node) => Self::render_range(ctx, range_node, output)?,
-                Node::With(with_node) => Self::render_with(ctx, with_node, output)?,
+                Node::If(if_node) => Self::render_if_hot(ctx, if_node, output)?,
+                Node::Range(range_node) => Self::render_range_hot(ctx, range_node, output)?,
+                Node::With(with_node) => Self::render_with_hot(ctx, with_node, output)?,
             }
         }
         Ok(())
     }
 
-    fn render_if(
-        ctx: &mut runtime::EvalContext,
+    fn render_if_hot(
+        ctx: &mut runtime_hot::EvalContextHot,
         node: &crate::ast::IfNode,
         output: &mut String,
     ) -> Result<(), Error> {
         let value = ctx.eval_pipeline(&node.pipeline)?;
         ctx.apply_bindings(&node.pipeline, &value)?;
-        if runtime::is_truthy(&value) {
-            Self::render_block(ctx, &node.then_block, output)?;
+        if runtime::is_truthy(value.as_value()) {
+            Self::render_block_hot(ctx, &node.then_block, output)?;
         } else {
             for branch in &node.else_if_branches {
                 let branch_value = ctx.eval_pipeline(&branch.pipeline)?;
                 ctx.apply_bindings(&branch.pipeline, &branch_value)?;
-                if runtime::is_truthy(&branch_value) {
-                    Self::render_block(ctx, &branch.block, output)?;
+                if runtime::is_truthy(branch_value.as_value()) {
+                    Self::render_block_hot(ctx, &branch.block, output)?;
                     return Ok(());
                 }
             }
             if let Some(else_block) = &node.else_block {
-                Self::render_block(ctx, else_block, output)?;
+                Self::render_block_hot(ctx, else_block, output)?;
             }
         }
         Ok(())
     }
 
-    fn render_range(
-        ctx: &mut runtime::EvalContext,
+    fn render_range_hot(
+        ctx: &mut runtime_hot::EvalContextHot,
         node: &crate::ast::RangeNode,
         output: &mut String,
     ) -> Result<(), Error> {
         ctx.predeclare_bindings(&node.pipeline);
-        let value = ctx.eval_pipeline(&node.pipeline)?;
-
+        let range_value = ctx.eval_pipeline(&node.pipeline)?.into_owned();
         let mut iterated = false;
 
-        match value {
+        match range_value {
             Value::Array(items) => {
                 if items.is_empty() {
-                    // handled later for else
+                    // handled later
                 } else {
                     for (index, item) in items.iter().enumerate() {
-                        let key_value = Value::Number(Number::from(index as u64));
-                        ctx.assign_range_bindings(&node.pipeline, Some(key_value), item.clone())?;
-                        ctx.push_scope(item.clone());
-                        let render_result = Self::render_block(ctx, &node.then_block, output);
+                        let idx_value = Value::Number(Number::from(index as u64));
+                        let element = item.clone();
+                        ctx.assign_range_bindings(
+                            &node.pipeline,
+                            Some(idx_value),
+                            element.clone(),
+                        )?;
+                        ctx.push_scope_slot(runtime_hot::ValueSlot::owned(element));
+                        let render_result = Self::render_block_hot(ctx, &node.then_block, output);
                         ctx.pop_scope();
                         render_result?;
                         iterated = true;
@@ -249,10 +379,14 @@ impl Template {
                     // handled later
                 } else {
                     for (key, val) in map.iter() {
-                        let key_value = Value::String(key.clone());
-                        ctx.assign_range_bindings(&node.pipeline, Some(key_value), val.clone())?;
-                        ctx.push_scope(val.clone());
-                        let render_result = Self::render_block(ctx, &node.then_block, output);
+                        let entry_value = val.clone();
+                        ctx.assign_range_bindings(
+                            &node.pipeline,
+                            Some(Value::String(key.clone())),
+                            entry_value.clone(),
+                        )?;
+                        ctx.push_scope_slot(runtime_hot::ValueSlot::owned(entry_value));
+                        let render_result = Self::render_block_hot(ctx, &node.then_block, output);
                         ctx.pop_scope();
                         render_result?;
                         iterated = true;
@@ -265,27 +399,27 @@ impl Template {
         if !iterated {
             ctx.assign_range_bindings(&node.pipeline, None, Value::Null)?;
             if let Some(else_block) = &node.else_block {
-                Self::render_block(ctx, else_block, output)?;
+                Self::render_block_hot(ctx, else_block, output)?;
             }
         }
 
         Ok(())
     }
 
-    fn render_with(
-        ctx: &mut runtime::EvalContext,
+    fn render_with_hot(
+        ctx: &mut runtime_hot::EvalContextHot,
         node: &crate::ast::WithNode,
         output: &mut String,
     ) -> Result<(), Error> {
         let value = ctx.eval_pipeline(&node.pipeline)?;
         ctx.apply_bindings(&node.pipeline, &value)?;
-        if runtime::is_truthy(&value) {
-            ctx.push_scope(value.clone());
-            let render_result = Self::render_block(ctx, &node.then_block, output);
+        if runtime::is_truthy(value.as_value()) {
+            ctx.push_scope_slot(value.clone());
+            let render_result = Self::render_block_hot(ctx, &node.then_block, output);
             ctx.pop_scope();
             render_result?;
         } else if let Some(else_block) = &node.else_block {
-            Self::render_block(ctx, else_block, output)?;
+            Self::render_block_hot(ctx, else_block, output)?;
         }
         Ok(())
     }
@@ -365,6 +499,20 @@ mod tests {
         let tmpl = Template::parse_str("missing", "{{unknown .}} ").unwrap();
         let err = tmpl.render(&json!(1)).unwrap_err();
         assert!(err.to_string().contains("unknown function"));
+    }
+
+    #[test]
+    fn render_arc_matches_string_output() {
+        let tmpl = Template::parse_str("arc", "Hello, {{.name}}!").unwrap();
+        let data = json!({"name": "Lithos"});
+        let string_output = tmpl.render(&data).unwrap();
+        let cached = tmpl.last_render_arc().unwrap();
+        let cached_string = String::from_utf8(cached.as_ref().to_vec()).unwrap();
+        assert_eq!(string_output, cached_string);
+
+        let arc_output = tmpl.render_arc(&data).unwrap();
+        let arc_string = String::from_utf8(arc_output.as_ref().to_vec()).unwrap();
+        assert_eq!(string_output, arc_string);
     }
 
     #[test]

@@ -4,16 +4,54 @@ use std::sync::Arc;
 
 use serde_json::{Number, Value};
 
-use crate::ast::{BindingKind, Command, Expression, Pipeline};
+use crate::ast::{Command, Expression, Pipeline};
 use crate::error::Error;
+use crate::runtime_hot;
+use crate::telemetry;
 
 /// Signature implemented by helper functions invoked from templates.
 pub type Function = dyn Fn(&mut EvalContext, &[Value]) -> Result<Value, Error> + Send + Sync;
 
+#[derive(Clone)]
+pub(crate) enum HelperEntry {
+    Compat(Arc<Function>),
+    Fast {
+        fast: Arc<runtime_hot::FastFunction>,
+        compat: Option<Arc<Function>>,
+    },
+}
+
+impl HelperEntry {
+    fn as_legacy(&self) -> Option<Arc<Function>> {
+        match self {
+            HelperEntry::Compat(func) => Some(func.clone()),
+            HelperEntry::Fast { compat, .. } => compat.clone(),
+        }
+    }
+
+    pub(crate) fn invoke_hot<'a>(
+        &self,
+        ctx: &mut runtime_hot::EvalContextHot<'a>,
+        args: &[runtime_hot::ValueView<'a>],
+    ) -> Result<runtime_hot::ValueSlot<'a>, Error> {
+        match self {
+            HelperEntry::Compat(func) => runtime_hot::invoke_legacy_helper(func.clone(), ctx, args),
+            HelperEntry::Fast { fast, .. } => fast(ctx, args),
+        }
+    }
+
+    pub(crate) fn telemetry_kind(&self) -> &'static str {
+        match self {
+            HelperEntry::Compat(_) => "legacy",
+            HelperEntry::Fast { .. } => "fast",
+        }
+    }
+}
+
 /// Registry that maps helper names to callable functions.
 #[derive(Clone, Default)]
 pub struct FunctionRegistry {
-    map: Arc<HashMap<String, Arc<Function>>>,
+    map: Arc<HashMap<String, HelperEntry>>,
 }
 
 impl FunctionRegistry {
@@ -36,6 +74,10 @@ impl FunctionRegistry {
 
     /// Fetches a helper function by name.
     pub fn get(&self, name: &str) -> Option<Arc<Function>> {
+        self.map.get(name).and_then(|entry| entry.as_legacy())
+    }
+
+    pub(crate) fn get_entry(&self, name: &str) -> Option<HelperEntry> {
         self.map.get(name).cloned()
     }
 
@@ -55,7 +97,7 @@ impl FunctionRegistry {
 /// Helper for constructing registries before freezing them into an immutable map.
 #[derive(Default)]
 pub struct FunctionRegistryBuilder {
-    map: HashMap<String, Arc<Function>>,
+    map: HashMap<String, HelperEntry>,
 }
 
 impl FunctionRegistryBuilder {
@@ -71,7 +113,54 @@ impl FunctionRegistryBuilder {
     where
         F: Fn(&mut EvalContext, &[Value]) -> Result<Value, Error> + Send + Sync + 'static,
     {
-        self.map.insert(name.into(), Arc::new(func));
+        self.map
+            .insert(name.into(), HelperEntry::Compat(Arc::new(func)));
+        self
+    }
+
+    pub fn register_fast<F>(&mut self, name: impl Into<String>, func: F) -> &mut Self
+    where
+        F: for<'a> Fn(
+                &mut runtime_hot::EvalContextHot<'a>,
+                &[runtime_hot::ValueView<'a>],
+            ) -> Result<runtime_hot::ValueSlot<'a>, Error>
+            + Send
+            + Sync
+            + 'static,
+    {
+        self.map.insert(
+            name.into(),
+            HelperEntry::Fast {
+                fast: Arc::new(func),
+                compat: None,
+            },
+        );
+        self
+    }
+
+    pub fn register_fast_with_compat<F, L>(
+        &mut self,
+        name: impl Into<String>,
+        fast: F,
+        compat: L,
+    ) -> &mut Self
+    where
+        F: for<'a> Fn(
+                &mut runtime_hot::EvalContextHot<'a>,
+                &[runtime_hot::ValueView<'a>],
+            ) -> Result<runtime_hot::ValueSlot<'a>, Error>
+            + Send
+            + Sync
+            + 'static,
+        L: Fn(&mut EvalContext, &[Value]) -> Result<Value, Error> + Send + Sync + 'static,
+    {
+        self.map.insert(
+            name.into(),
+            HelperEntry::Fast {
+                fast: Arc::new(fast),
+                compat: Some(Arc::new(compat)),
+            },
+        );
         self
     }
 
@@ -100,7 +189,7 @@ pub struct EvalContext {
 }
 
 enum CommandResolution {
-    Function(Arc<Function>),
+    Function { name: String, func: Arc<Function> },
     Identifier(String),
     Expression,
 }
@@ -172,7 +261,10 @@ impl EvalContext {
     fn resolve_command_target(&self, command: &Command) -> CommandResolution {
         if let Expression::Identifier(name) = &command.target {
             if let Some(func) = self.functions.get(name.as_str()) {
-                CommandResolution::Function(func)
+                CommandResolution::Function {
+                    name: name.clone(),
+                    func,
+                }
             } else {
                 CommandResolution::Identifier(name.clone())
             }
@@ -188,7 +280,7 @@ impl EvalContext {
         resolution: &CommandResolution,
     ) -> Result<Vec<Value>, Error> {
         match resolution {
-            CommandResolution::Function(_) => {
+            CommandResolution::Function { .. } => {
                 let mut args =
                     Vec::with_capacity(command.args.len() + usize::from(input.is_some()));
                 for expr in &command.args {
@@ -230,7 +322,11 @@ impl EvalContext {
         args: Vec<Value>,
     ) -> Result<Value, Error> {
         match resolution {
-            CommandResolution::Function(func) => func(self, &args),
+            CommandResolution::Function { name, func } => {
+                let result = func(self, &args);
+                telemetry::record_helper_invocation(&name, "legacy", result.is_ok());
+                result
+            }
             CommandResolution::Identifier(_) | CommandResolution::Expression => {
                 debug_assert!(args.is_empty());
                 self.eval_expression(&command.target)
@@ -317,31 +413,6 @@ impl EvalContext {
         Value::Null
     }
 
-    fn set_variable(&mut self, name: &str, kind: BindingKind, value: Value) -> Result<(), Error> {
-        if name == "$" {
-            return Err(Error::render("cannot assign to root variable", None));
-        }
-
-        match kind {
-            BindingKind::Declare => {
-                self.variables
-                    .last_mut()
-                    .expect("scope stack is non-empty")
-                    .insert(name.to_string(), value);
-                Ok(())
-            }
-            BindingKind::Assign => {
-                for scope in self.variables.iter_mut().rev() {
-                    if scope.contains_key(name) {
-                        scope.insert(name.to_string(), value);
-                        return Ok(());
-                    }
-                }
-                Err(Error::render(format!("variable {name} not defined"), None))
-            }
-        }
-    }
-
     fn project_field_segment(value: Value, part: &str) -> Result<Value, Error> {
         match value {
             Value::Object(map) => Ok(map.get(part).cloned().unwrap_or(Value::Null)),
@@ -358,68 +429,16 @@ impl EvalContext {
         }
     }
 
-    pub(crate) fn apply_bindings(
-        &mut self,
-        pipeline: &Pipeline,
-        value: &Value,
-    ) -> Result<(), Error> {
-        if let Some(decls) = &pipeline.declarations {
-            if decls.variables.is_empty() {
-                return Ok(());
-            }
-
-            if decls.variables.len() == 1 {
-                self.set_variable(&decls.variables[0], decls.kind, value.clone())?;
-            } else if let Value::Array(items) = value {
-                for (idx, name) in decls.variables.iter().enumerate() {
-                    let assigned = items.get(idx).cloned().unwrap_or(Value::Null);
-                    self.set_variable(name, decls.kind, assigned)?;
-                }
-            } else {
-                for name in &decls.variables {
-                    self.set_variable(name, decls.kind, value.clone())?;
-                }
-            }
+    pub fn from_snapshot(
+        snapshot: runtime_hot::LegacySnapshot,
+        functions: FunctionRegistry,
+    ) -> Self {
+        Self {
+            stack: snapshot.stack,
+            root: snapshot.root,
+            variables: snapshot.variables,
+            functions,
         }
-        Ok(())
-    }
-
-    pub(crate) fn predeclare_bindings(&mut self, pipeline: &Pipeline) {
-        if let Some(decls) = &pipeline.declarations {
-            if decls.kind == BindingKind::Declare {
-                for name in &decls.variables {
-                    self.variables
-                        .last_mut()
-                        .expect("scope stack is non-empty")
-                        .entry(name.clone())
-                        .or_insert(Value::Null);
-                }
-            }
-        }
-    }
-
-    pub(crate) fn assign_range_bindings(
-        &mut self,
-        pipeline: &Pipeline,
-        key: Option<Value>,
-        value: Value,
-    ) -> Result<(), Error> {
-        if let Some(decls) = &pipeline.declarations {
-            match decls.variables.len() {
-                0 => {}
-                1 => {
-                    self.set_variable(&decls.variables[0], decls.kind, value)?;
-                }
-                _ => {
-                    let key_value = key.unwrap_or(Value::Null);
-                    self.set_variable(&decls.variables[0], decls.kind, key_value)?;
-                    if let Some(second) = decls.variables.get(1) {
-                        self.set_variable(second, decls.kind, value)?;
-                    }
-                }
-            }
-        }
-        Ok(())
     }
 }
 
@@ -444,7 +463,7 @@ mod tests {
 
         assert!(matches!(
             ctx.resolve_command_target(&command),
-            CommandResolution::Function(_)
+            CommandResolution::Function { .. }
         ));
     }
 
