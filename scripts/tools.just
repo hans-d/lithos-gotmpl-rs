@@ -14,7 +14,7 @@ recommend-mise:
 
 install-mise:
     if ! command -v mise >/dev/null 2>&1; then \
-        curl https://mise.run | sh
+        echo "install mise manually, see https://mise.jdx.dev/installing-mise.html"
     fi
 
 # cargo-audit
