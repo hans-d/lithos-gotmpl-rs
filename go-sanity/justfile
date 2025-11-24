@@ -1,0 +1,36 @@
+set shell := ["bash", "-cu"]
+cases_path := "test-cases/lithos-sprig.json"
+
+export GOCACHE := "../target/go-cache"
+
+default:
+
+ensure-gocache:
+    @mkdir -p ${GOCACHE}
+
+run: ensure-gocache
+    go run . -cases "$(git rev-parse --show-toplevel)/{{cases_path}}"
+
+install: ensure-gocache
+    go mod download
+
+lint:
+    golangci-lint run ./...
+
+
+deps:
+    go-licenses check ./... \
+        --allowed_licenses MIT,Apache-2.0,BSD-2-Clause,BSD-3-Clause,Unicode-DFS-2016,Unicode-3.0
+
+licenses:
+    mkdir -p ../target/legal/
+    go-licenses report . > ../target/legal/go-licenses.csv
+
+    rm -rf ../target/legal/go-licenses
+    mkdir -p ../target/legal/go-licenses
+    go-licenses save ./... --save_path ../target/legal/go-licenses --force
+
+ci-run:
+    just install
+    just lint
+    just run

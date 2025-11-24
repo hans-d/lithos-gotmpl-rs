@@ -202,10 +202,7 @@ fn to_number(name: &'static str, position: usize, value: &Value) -> Result<f64, 
 
 fn score_to_value(score: f64) -> Value {
     let is_integral = (score.fract() - 0.0).abs() < f64::EPSILON;
-    if is_integral
-        && score >= i64::MIN as f64
-        && score <= i64::MAX as f64
-    {
+    if is_integral && score >= i64::MIN as f64 && score <= i64::MAX as f64 {
         return Value::Number(Number::from(score as i64));
     }
 

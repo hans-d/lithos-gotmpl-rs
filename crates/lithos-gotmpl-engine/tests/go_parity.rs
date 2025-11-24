@@ -12,7 +12,32 @@ struct EngineCase {
     #[serde(default)]
     expected: Option<String>,
     #[serde(default)]
-    error: Option<String>,
+    error: Option<ExpectedError>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum ExpectedError {
+    Single(String),
+    Multiple(Vec<String>),
+}
+
+impl ExpectedError {
+    fn matches(&self, msg: &str) -> bool {
+        match self {
+            ExpectedError::Single(pattern) => msg.contains(pattern),
+            ExpectedError::Multiple(patterns) => {
+                patterns.iter().any(|pattern| msg.contains(pattern))
+            }
+        }
+    }
+
+    fn description(&self) -> String {
+        match self {
+            ExpectedError::Single(pattern) => pattern.clone(),
+            ExpectedError::Multiple(patterns) => patterns.join("' or '"),
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -96,15 +121,16 @@ fn go_reference_confirms_engine_cases() {
                     go_case.error
                 );
             }
-            (None, Some(_)) => {
+            (None, Some(expected_err)) => {
                 let err = go_case
                     .error
                     .as_ref()
                     .unwrap_or_else(|| panic!("go did not error for {}", case.name));
                 assert!(
-                    err.contains("unexpected <with>"),
-                    "go error for {} did not mention unexpected <with>: {}",
+                    expected_err.matches(err),
+                    "go error for {} did not match expected substring '{}': {}",
                     case.name,
+                    expected_err.description(),
                     err
                 );
             }

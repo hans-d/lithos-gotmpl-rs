@@ -35,9 +35,34 @@ struct TemplateFixture {
     #[serde(default)]
     expected: Option<String>,
     #[serde(default)]
-    error: Option<String>,
+    error: Option<ExpectedError>,
     #[serde(default)]
     skip_go: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum ExpectedError {
+    Single(String),
+    Multiple(Vec<String>),
+}
+
+impl ExpectedError {
+    fn matches(&self, message: &str) -> bool {
+        match self {
+            ExpectedError::Single(pattern) => message.contains(pattern),
+            ExpectedError::Multiple(patterns) => {
+                patterns.iter().any(|pattern| message.contains(pattern))
+            }
+        }
+    }
+
+    fn description(&self) -> String {
+        match self {
+            ExpectedError::Single(pattern) => pattern.clone(),
+            ExpectedError::Multiple(patterns) => patterns.join("' or '"),
+        }
+    }
 }
 
 #[test]
@@ -328,10 +353,10 @@ fn verify_template_case_file(runner_dir: &Path, go_cache: &Path, cases_path: &Pa
                     .error
                     .unwrap_or_else(|| panic!("{name}: expected go to report an error"));
                 assert!(
-                    go_err.contains(expected_err),
+                    expected_err.matches(&go_err),
                     "{name}: go error '{}' did not include expected substring '{}'",
                     go_err,
-                    expected_err
+                    expected_err.description()
                 );
             }
             None => {

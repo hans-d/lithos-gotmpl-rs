@@ -15,7 +15,32 @@ struct EngineCase {
     #[serde(default)]
     expected: Option<String>,
     #[serde(default)]
-    error: Option<String>,
+    error: Option<ExpectedError>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum ExpectedError {
+    Single(String),
+    Multiple(Vec<String>),
+}
+
+impl ExpectedError {
+    fn matches(&self, message: &str) -> bool {
+        match self {
+            ExpectedError::Single(pattern) => message.contains(pattern),
+            ExpectedError::Multiple(patterns) => {
+                patterns.iter().any(|pattern| message.contains(pattern))
+            }
+        }
+    }
+
+    fn description(&self) -> String {
+        match self {
+            ExpectedError::Single(pattern) => pattern.clone(),
+            ExpectedError::Multiple(patterns) => patterns.join("' or '"),
+        }
+    }
 }
 
 fn registry() -> FunctionRegistry {
@@ -43,10 +68,10 @@ fn engine_test_cases_align_with_go_semantics() {
                 if let Some(expected_err) = case.error.as_ref() {
                     let msg = err.to_string();
                     assert!(
-                        msg.contains(expected_err),
+                        expected_err.matches(&msg),
                         "{} expected parse error containing '{}', got '{}'",
                         case.name,
-                        expected_err,
+                        expected_err.description(),
                         msg
                     );
                     continue;
@@ -61,15 +86,17 @@ fn engine_test_cases_align_with_go_semantics() {
             match result {
                 Ok(output) => panic!(
                     "{} expected error '{}' but rendered '{}'",
-                    case.name, expected_err, output
+                    case.name,
+                    expected_err.description(),
+                    output
                 ),
                 Err(err) => {
                     let msg = err.to_string();
                     assert!(
-                        msg.contains(expected_err),
+                        expected_err.matches(&msg),
                         "{} expected error containing '{}', got '{}'",
                         case.name,
-                        expected_err,
+                        expected_err.description(),
                         msg
                     );
                 }

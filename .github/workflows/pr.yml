@@ -1,0 +1,190 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+---
+name: PR
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: pr-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+# yamllint disable-line rule:truthy
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ steps.filter.outputs.rust }}
+      go: ${{ steps.filter.outputs.go }}
+      lint: ${{ steps.filter.outputs.lint }}
+      deps: ${{ steps.filter.outputs.deps }}
+      tests: ${{ steps.filter.outputs.tests }}
+      ci: ${{ steps.filter.outputs.ci }}
+    steps:
+      - name: Harden runner
+        # yamllint disable-line rule:comments
+        uses: step-security/harden-runner@95d9a5deda9de15063e7595e9719c11c38c90ae2 # v2.13.2
+        with:
+          egress-policy: audit
+      - name: Checkout repository
+        # yamllint disable-line rule:comments
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+      - name: Prepare tooling
+        uses: ./.github/actions/setup-tools
+      - name: Compute path filters
+        id: filter
+        # yamllint disable-line rule:comments
+        uses: dorny/paths-filter@v3.0.2
+        with:
+          filters: |
+            ci:
+              - justfile
+              - .github/workflows/**
+              - scripts/tools.just
+            tests:
+              - test-cases/**
+              - fixtures/**
+            rust:
+              - Cargo.lock
+              - Cargo.toml
+              - crates/**
+              - rust.just
+            go:
+              - go-sanity/**
+            deps:
+              - Cargo.lock
+              - Cargo.toml
+              - deny.toml
+              - '**/go.mod'
+              - '**/go.sum'
+
+  rust:
+    name: Rust
+    needs: changes
+    if: >-
+      needs.changes.outputs.rust == 'true'
+      || needs.changes.outputs.tests == 'true'
+      || needs.changes.outputs.ci == 'true'
+      || github.event_name != 'pull_request'
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        # yamllint disable-line rule:comments
+        uses: step-security/harden-runner@95d9a5deda9de15063e7595e9719c11c38c90ae2 # v2.13.2
+        with:
+          egress-policy: audit
+      - name: Checkout repository
+        # yamllint disable-line rule:comments
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+      - name: Prepare toolchains
+        uses: ./.github/actions/setup-tools
+        with:
+          install_rust: "true"
+      - name: Run pr recipes
+        run: just rust ci-pr
+
+  go:
+    name: Go & Compatibility Tests
+    needs: changes
+    if: >-
+      needs.changes.outputs.go == 'true'
+      || needs.changes.outputs.tests == 'true'
+      || needs.changes.outputs.ci == 'true'
+      || github.event_name != 'pull_request'
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        # yamllint disable-line rule:comments
+        uses: step-security/harden-runner@95d9a5deda9de15063e7595e9719c11c38c90ae2 # v2.13.2
+        with:
+          egress-policy: audit
+      - name: Checkout repository
+        # yamllint disable-line rule:comments
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+      - name: Prepare toolchains
+        uses: ./.github/actions/setup-tools
+        with:
+          install_go: "true"
+      - name: go-sanity
+        run: just go-sanity ci-run
+
+  automation:
+    name: Automation checks
+    needs: changes
+    if: >-
+      needs.changes.outputs.ci == 'true'
+      || github.event_name != 'pull_request'
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        # yamllint disable-line rule:comments
+        uses: step-security/harden-runner@95d9a5deda9de15063e7595e9719c11c38c90ae2 # v2.13.2
+        with:
+          egress-policy: audit
+      - name: Checkout repository
+        # yamllint disable-line rule:comments
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+      - name: Prepare tooling
+        uses: ./.github/actions/setup-tools
+      - name: Linting
+        run: just lint-automation
+
+  lint:
+    name: General linters
+    needs: changes
+    if: >-
+      needs.changes.outputs.lint == 'true'
+      || github.event_name != 'pull_request'
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        # yamllint disable-line rule:comments
+        uses: step-security/harden-runner@95d9a5deda9de15063e7595e9719c11c38c90ae2 # v2.13.2
+        with:
+          egress-policy: audit
+      - name: Checkout repository
+        # yamllint disable-line rule:comments
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+      - name: Prepare tooling
+        uses: ./.github/actions/setup-tools
+      - name: yaml
+        run: just yaml-lint
+
+  dependencies:
+    name: General Dependency Policies
+    needs: changes
+    if: >-
+      needs.changes.outputs.deps == 'true'
+      || github.event_name != 'pull_request'
+    timeout-minutes: 25
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        # yamllint disable-line rule:comments
+        uses: step-security/harden-runner@95d9a5deda9de15063e7595e9719c11c38c90ae2 # v2.13.2
+        with:
+          egress-policy: audit
+      - name: Checkout repository
+        # yamllint disable-line rule:comments
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+      - name: Dependency review
+        # yamllint disable-line rule:comments
+        uses: actions/dependency-review-action@3c4e3dcb1aa7874d2c16be7d79418e9b7efd6261 # v4.8.2
+        with:
+          fail-on-severity: high
+          allow-licenses: >
+            Apache-2.0,MIT,BSD-2-Clause,BSD-3-Clause,Unicode-DFS-2016,Unicode-3.0,BSL-1.0,LGPL-2.1-or-later

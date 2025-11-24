@@ -1,0 +1,61 @@
+name: Setup Project Tooling
+description: Install mise-managed CLIs and optional Rust/Go toolchains.
+inputs:
+  install_rust:
+    description: "Set up Rust toolchain via dtolnay/rust-toolchain."
+    default: "false"
+  rust_toolchain:
+    description: "Rust toolchain identifier."
+    default: "stable"
+  rust_components:
+    description: "Optional comma-separated Rust components."
+    default: ""
+  cache_rust:
+    description: "Enable Swatinem/rust-cache when installing Rust."
+    default: "true"
+  install_go:
+    description: "Set up Go using actions/setup-go."
+    default: "false"
+  go_version_file:
+    description: "Path to go.mod used for version detection."
+    default: "go-sanity/go.mod"
+  go_cache_dependency_path:
+    description: "Paths for Go dependency cache."
+    default: "go-sanity/go.sum"
+  go_check_latest:
+    description: "Whether to ask setup-go to check latest patch version."
+    default: "true"
+  mise_version:
+    description: "mise release to install."
+    default: "2025.11.7"
+  github_token:
+    description: "Token for mise action (defaults to workflow token)."
+    default: ""
+runs:
+  using: composite
+  steps:
+    - name: Install mise tools
+      uses: jdx/mise-action@v3.5.0
+      with:
+        version: ${{ inputs.mise_version }}
+        github_token: ${{ inputs.github_token != '' && inputs.github_token || github.token }}
+
+    - name: Set up Rust toolchain
+      if: ${{ inputs.install_rust == 'true' }}
+      uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+      with:
+        toolchain: ${{ inputs.rust_toolchain }}
+        components: ${{ inputs.rust_components }}
+
+    - name: Cache Rust tooling
+      if: ${{ inputs.install_rust == 'true' && inputs.cache_rust == 'true' }}
+      uses: Swatinem/rust-cache@v2.8.1
+
+    - name: Set up Go toolchain
+      if: ${{ inputs.install_go == 'true' }}
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+      with:
+        go-version-file: ${{ inputs.go_version_file }}
+        cache: true
+        check-latest: ${{ inputs.go_check_latest == 'true' }}
+        cache-dependency-path: ${{ inputs.go_cache_dependency_path }}

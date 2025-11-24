@@ -1,0 +1,7 @@
+set shell := ["bash", "-cu"]
+
+default:
+    just --list
+
+lint:
+    actionlint
