@@ -2,35 +2,35 @@ name: Setup Project Tooling
 description: Install mise-managed CLIs and optional Rust/Go toolchains.
 inputs:
   install_rust:
-    description: 'Set up Rust toolchain via dtolnay/rust-toolchain.'
-    default: 'false'
+    description: "Set up Rust toolchain via dtolnay/rust-toolchain."
+    default: "false"
   rust_toolchain:
-    description: 'Rust toolchain identifier.'
-    default: 'stable'
+    description: "Rust toolchain identifier."
+    default: "stable"
   rust_components:
-    description: 'Optional comma-separated Rust components.'
-    default: ''
+    description: "Optional comma-separated Rust components."
+    default: ""
   cache_rust:
-    description: 'Enable Swatinem/rust-cache when installing Rust.'
-    default: 'true'
+    description: "Enable Swatinem/rust-cache when installing Rust."
+    default: "true"
   install_go:
-    description: 'Set up Go using actions/setup-go.'
-    default: 'false'
+    description: "Set up Go using actions/setup-go."
+    default: "false"
   go_version_file:
-    description: 'Path to go.mod used for version detection.'
-    default: 'go-sanity/go.mod'
+    description: "Path to go.mod used for version detection."
+    default: "go-sanity/go.mod"
   go_cache_dependency_path:
-    description: 'Paths for Go dependency cache.'
-    default: 'go-sanity/go.sum'
+    description: "Paths for Go dependency cache."
+    default: "go-sanity/go.sum"
   go_check_latest:
-    description: 'Whether to ask setup-go to check latest patch version.'
-    default: 'true'
+    description: "Whether to ask setup-go to check latest patch version."
+    default: "true"
   mise_version:
-    description: 'mise release to install.'
-    default: '2024.10.0'
+    description: "mise release to install."
+    default: "2025.11.7"
   github_token:
-    description: 'Token for mise action (defaults to workflow token).'
-    default: ''
+    description: "Token for mise action (defaults to workflow token)."
+    default: ""
 runs:
   using: composite
   steps:
