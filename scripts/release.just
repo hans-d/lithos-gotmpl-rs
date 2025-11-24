@@ -1,4 +1,2 @@
-mod tools 'tools.just'
-
-default: tools::ensure-release-plz
+default:
     release-plz release --dry-run

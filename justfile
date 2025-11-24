@@ -5,13 +5,12 @@ default:
 
 mod go-sanity
 mod go 'go-sanity'
-mod tools 'scripts/tools.just'
 mod rust 'rust.just'
 mod github '.github/justfile'
 
 lint-automation: github::lint
 
-yaml-lint: tools::ensure-yamllint
+yaml-lint:
     yamllint -c .yamllint.yaml .
 
 deps: rust::deps go::deps
@@ -21,23 +20,23 @@ test: rust::test
 
 # tbd
 
-ci-osv: tools::ensure-osv-scanner
+ci-osv:
     mkdir -p target
     osv-scanner --recursive --output=target/osv-report.json .
     @echo "OSV report written to target/osv-report.json"
 
-coverage: tools::ensure-cargo-tarpaulin
+coverage:
     cargo tarpaulin --workspace --all-features --engine llvm --out Html
 
-sbom: tools::ensure-syft
+sbom:
     mkdir -p target/sbom
     syft dir:. --output cyclonedx-json=target/sbom/sbom.json
 
-scancode: tools::ensure-scancode
+scancode:
     mkdir -p target/scancode
     scancode --strip-root --html target/scancode/report.html --summary-json target/scancode/summary.json --license-text target/scancode/licenses --processes 4 .
 
-gh-repo-audit: tools::ensure-gh
+gh-repo-audit:
     export GH_PAGER=; \
     repo=$(gh repo view --json nameWithOwner --jq '.nameWithOwner') && \
     echo "# Repository security configuration" && \
