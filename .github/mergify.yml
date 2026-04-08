@@ -4,3 +4,5 @@ merge_queue:
   max_parallel_checks: 1
   reset_on_external_merge: always
   mode: serial
+merge_protections_settings:
+  reporting_method: check-runs
