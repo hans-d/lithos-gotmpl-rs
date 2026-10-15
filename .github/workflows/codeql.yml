@@ -45,7 +45,7 @@ jobs:
 
       - name: Initialize CodeQL
         # yamllint disable-line rule:comments
-        uses: github/codeql-action/init@e12f0178983d466f2f6028f5cc7a6d786fd97f4b # v4.31.4
+        uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           languages: go, rust
 
@@ -66,8 +66,8 @@ jobs:
 
       - name: Autobuild
         # yamllint disable-line rule:comments
-        uses: github/codeql-action/autobuild@e12f0178983d466f2f6028f5cc7a6d786fd97f4b # v4.31.4
+        uses: github/codeql-action/autobuild@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
 
       - name: Perform CodeQL Analysis
         # yamllint disable-line rule:comments
-        uses: github/codeql-action/analyze@e12f0178983d466f2f6028f5cc7a6d786fd97f4b # v4.31.4
+        uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
